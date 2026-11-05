@@ -1,0 +1,140 @@
+{
+  "name": "BI Antivirus - Critical Voice Alert",
+  "nodes": [
+    {
+      "id": "node-voice-webhook",
+      "name": "Voice Alert Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "bi-voice-alert-webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bi-voice-alert",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Receives critical threats for spoken voice dispatch. MIT License - Black Intel."
+    },
+    {
+      "id": "node-check-critical-severity",
+      "name": "Verify Critical Severity",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.severity }}",
+              "operation": "equals",
+              "value2": "CRITICAL"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-prepare-speech-text",
+      "name": "Prepare Spoken Announcement",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fld-speech-text",
+              "name": "speech_text",
+              "value": "=Attention: Critical security alert. Threat detected: {{ $json.body.threat_name }}. Action taken: {{ $json.body.action_taken }}.",
+              "type": "string"
+            },
+            {
+              "id": "fld-priority",
+              "name": "priority",
+              "value": "CRITICAL",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-dispatch-local-voice",
+      "name": "Dispatch to Local Voice Engine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8765/api/v1/voice/announce",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-BI-API-Key",
+              "value": "={{ $env.BI_ANTIVIRUS_API_KEY || 'CONFIGURE_API_KEY' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.speech_text }}\",\n  \"priority\": \"CRITICAL\"\n}",
+        "options": {
+          "timeout": 8000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Voice Alert Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Critical Severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Critical Severity": {
+      "main": [
+        [
+          {
+            "node": "Prepare Spoken Announcement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Spoken Announcement": {
+      "main": [
+        [
+          {
+            "node": "Dispatch to Local Voice Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": [
+    "bi-antivirus",
+    "voice-alert",
+    "tts",
+    "security",
+    "mit-licensed"
+  ]
+}

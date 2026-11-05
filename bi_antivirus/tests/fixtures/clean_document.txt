@@ -1,0 +1,3 @@
+This is a standard harmless text document used for false-positive validation in BI Antivirus.
+It contains standard engineering documentation and safe code snippets.
+No malicious code, dropper scripts, or ransomware behaviors are present here.

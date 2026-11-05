@@ -1,0 +1,87 @@
+# ==============================================================================
+# BI Antivirus - Security & Privacy Protection Ignore Rules
+# Enforces complete isolation of local secrets, user data, databases, and dependencies
+# ==============================================================================
+
+# 1. API Keys, Passwords & Secret Tokens
+data/api_key.txt
+**/api_key.txt
+*.key
+*.token
+*.secret
+
+# 2. Environment Files & Secret Configurations
+*.env
+*.env.local
+config/n8n/n8n.env
+data/n8n/.n8n/config
+!*.env.example
+!config/n8n/n8n.env.example
+
+# 3. Local SQLite Databases, WAL Files & Storage
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/*.db
+data/n8n/
+data/n8n/**
+data/settings.json
+data/binaryData/
+
+# 4. Reversible Encrypted Quarantine Vault (.biq)
+quarantine/
+quarantine/**
+*.biq
+
+# 5. Runtime Logs, Telemetry & Process IDs
+*.log
+logs/
+logs/**
+*.pid
+
+# 6. Pre-Hardening Backups & Archives
+backups/
+backups/**
+*.bak
+*.backup
+
+# 7. Node.js Runtime, Packages & npm Caches
+node_modules/
+n8n/node_modules/
+n8n/.npm-cache/
+.npm-cache/
+.npmrc
+
+# 8. External Source Archives & Staging Worktrees
+*.zip
+*.tar.gz
+*.7z
+n8n-Source-Integrations/
+n8n-workflows/
+VoiceStudio/
+integrations/staging/
+
+# 9. Python Bytecode, Caches & Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.pytest_cache/
+
+# 10. Local User Reports (Preserve report generation scripts & docs)
+reports/security_report_*.md
+reports/BI_ANTIVIRUS_N8N_VOICE_INTEGRATION_REPORT.md
+
+# 11. OS & IDE Metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,12 @@
+{
+  "name": "bi-antivirus-n8n",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Genuine n8n Community Edition for BI Antivirus",
+  "scripts": {
+    "start": "n8n"
+  },
+  "dependencies": {
+    "n8n": "latest"
+  }
+}

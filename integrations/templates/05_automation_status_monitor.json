@@ -1,0 +1,155 @@
+{
+  "name": "BI Antivirus - Automation Status Monitor",
+  "nodes": [
+    {
+      "id": "node-health-interval",
+      "name": "Health Check Schedule (15m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "notes": "Monitors BI Antivirus Local API health and communication status. MIT License - Black Intel."
+    },
+    {
+      "id": "node-poll-api-health",
+      "name": "Query Local BI API Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8765/api/v1/status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-BI-API-Key",
+              "value": "={{ $env.BI_ANTIVIRUS_API_KEY || 'CONFIGURE_API_KEY' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "node-check-online-status",
+      "name": "Check If Engine Responding",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-log-healthy",
+      "name": "Record Healthy Status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [920, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fld-health-state",
+              "name": "health_status",
+              "value": "=CONNECTED: BI Antivirus Engine is active (State: {{ $json.status }}, Uptime: {{ $json.uptime_seconds }}s)",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-record-failure-alert",
+      "name": "Record Offline / Unreachable Alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [920, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fld-offline-alert",
+              "name": "offline_alert",
+              "value": "WARNING: BI Antivirus Local API is OFFLINE or rejecting authorization on 127.0.0.1:8765. Manual review required. (Automatic service restart or Windows reconfiguration is prohibited).",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Health Check Schedule (15m)": {
+      "main": [
+        [
+          {
+            "node": "Query Local BI API Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Local BI API Status": {
+      "main": [
+        [
+          {
+            "node": "Check If Engine Responding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Engine Responding": {
+      "main": [
+        [
+          {
+            "node": "Record Healthy Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Offline / Unreachable Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": [
+    "bi-antivirus",
+    "monitoring",
+    "health-check",
+    "mit-licensed"
+  ]
+}

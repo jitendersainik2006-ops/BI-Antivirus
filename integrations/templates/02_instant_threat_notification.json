@@ -1,0 +1,162 @@
+{
+  "name": "BI Antivirus - Instant Threat Notification",
+  "nodes": [
+    {
+      "id": "node-threat-webhook",
+      "name": "Threat Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "bi-threat-alert-webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bi-threat-alert",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Receives verified threat events from BI Antivirus Engine. MIT License - Black Intel."
+    },
+    {
+      "id": "node-filter-severity",
+      "name": "Filter High and Critical Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.severity }}",
+              "operation": "regex",
+              "value2": "^(HIGH|CRITICAL)$"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-format-threat-card",
+      "name": "Format Sanitized Alert Card",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fld-msg-title",
+              "name": "alert_title",
+              "value": "=🚨 BI ANTIVIRUS INCIDENT ALERT: {{ $json.body.severity }}",
+              "type": "string"
+            },
+            {
+              "id": "fld-msg-body",
+              "name": "alert_body",
+              "value": "=*Threat Name:* `{{ $json.body.threat_name }}`\n*Severity:* *{{ $json.body.severity }}*\n*Detection:* `{{ $json.body.detection_method }}`\n*SHA-256:* `{{ $json.body.file_hash }}`\n*Action Taken:* `{{ $json.body.action_taken }}`\n*Event ID:* `{{ $json.body.event_id }}`\n*Timestamp:* `{{ $json.body.timestamp }}`\n\n_File contents and credentials are protected and excluded._",
+              "type": "string"
+            },
+            {
+              "id": "fld-email-subject",
+              "name": "email_subject",
+              "value": "=[BI ANTIVIRUS] {{ $json.body.severity }} Threat Detected: {{ $json.body.threat_name }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-telegram-alert",
+      "name": "Send Telegram Alert (When Configured)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [920, 100],
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'UNCONFIGURED_CHAT_ID' }}",
+        "text": "={{ $json.alert_title }}\n\n{{ $json.alert_body }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_TELEGRAM_CREDENTIAL",
+          "name": "Telegram Bot Token"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "node-email-alert",
+      "name": "Send Email Alert (When Configured)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [920, 300],
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_FROM_EMAIL || 'alerts@bi-antivirus.local' }}",
+        "toEmail": "={{ $env.ALERT_TO_EMAIL || 'security-admin@bi-antivirus.local' }}",
+        "subject": "={{ $json.email_subject }}",
+        "text": "={{ $json.alert_title }}\n\n{{ $json.alert_body }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "CONFIGURE_SMTP_CREDENTIAL",
+          "name": "SMTP Account"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Threat Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter High and Critical Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter High and Critical Only": {
+      "main": [
+        [
+          {
+            "node": "Format Sanitized Alert Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Sanitized Alert Card": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert (When Configured)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email Alert (When Configured)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": [
+    "bi-antivirus",
+    "security",
+    "threat-alert",
+    "mit-licensed"
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "name": "BI Antivirus Health Monitor",
+  "nodes": [
+    {
+      "id": "node-manual-trigger",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "id": "node-http-status",
+      "name": "Check BI Antivirus Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8765/api/v1/status",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000,
+          "neverError": true
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bi-antivirus-local-key",
+          "name": "BI Antivirus Local API Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "node-if-healthy",
+      "name": "Is Status Healthy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-status-healthy",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PROTECTED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-guard-active",
+              "leftValue": "={{ $json.realtime_guard_active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-set-healthy",
+      "name": "Record Healthy Assessment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 220],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "asgn-health",
+              "name": "health_status",
+              "value": "PASSED - SECURE",
+              "type": "string"
+            },
+            {
+              "id": "asgn-engine",
+              "name": "engine",
+              "value": "={{ $json.engine }}",
+              "type": "string"
+            },
+            {
+              "id": "asgn-version",
+              "name": "engine_version",
+              "value": "={{ $json.engine_version }}",
+              "type": "string"
+            },
+            {
+              "id": "asgn-sigs",
+              "name": "active_signatures",
+              "value": "={{ $json.total_signatures }}",
+              "type": "number"
+            },
+            {
+              "id": "asgn-guard",
+              "name": "realtime_guard",
+              "value": "={{ $json.realtime_guard_active }}",
+              "type": "boolean"
+            },
+            {
+              "id": "asgn-audit",
+              "name": "monitored_by",
+              "value": "Genuine n8n Community Edition (Port 5679)",
+              "type": "string"
+            },
+            {
+              "id": "asgn-timestamp",
+              "name": "check_timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-set-warning",
+      "name": "Record Warning Assessment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 380],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "asgn-health-warn",
+              "name": "health_status",
+              "value": "ATTENTION NEEDED",
+              "type": "string"
+            },
+            {
+              "id": "asgn-err-cat",
+              "name": "error_category",
+              "value": "={{ $json.error ? ($json.error.message && ($json.error.message.includes('aborted') || $json.error.message.includes('ETIMEDOUT') || $json.error.message.includes('timeout')) ? 'TIMEOUT' : ($json.error.message && ($json.error.message.includes('refused') || $json.error.message.includes('ECONNREFUSED')) ? 'CONNECTION_REFUSED' : ($json.statusCode === 401 || $json.error === 'Unauthorized' || ($json.error.message && ($json.error.message.includes('Authorization') || $json.error.message.includes('credentials'))) ? 'UNAUTHORIZED' : 'API_ERROR'))) : ($json.status !== 'PROTECTED' ? 'STATUS_DEGRADED' : (!$json.realtime_guard_active ? 'GUARD_INACTIVE' : 'SCHEMA_INVALID')) }}",
+              "type": "string"
+            },
+            {
+              "id": "asgn-http-code",
+              "name": "http_status_code",
+              "value": "={{ $json.statusCode || ($json.error === 'Unauthorized' || ($json.error && $json.error.message && $json.error.message.includes('Authorization')) ? 401 : ($json.status ? 200 : 0)) }}",
+              "type": "number"
+            },
+            {
+              "id": "asgn-detail",
+              "name": "current_status",
+              "value": "={{ $json.status || ($json.error && $json.error.message ? 'UNREACHABLE' : ($json.error ? String($json.error) : 'UNKNOWN')) }}",
+              "type": "string"
+            },
+            {
+              "id": "asgn-guard-warn",
+              "name": "realtime_guard",
+              "value": "={{ $json.realtime_guard_active === true ? true : false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "asgn-diag-msg",
+              "name": "diagnostic_message",
+              "value": "={{ $json.error ? (typeof $json.error === 'object' && $json.error.message ? $json.error.message : String($json.error)) : ($json.status !== 'PROTECTED' ? 'Antivirus system status is not PROTECTED (' + ($json.status || 'MISSING') + ')' : (!$json.realtime_guard_active ? 'Real-time protection guard is inactive' : 'Unexpected API response structure')) }}",
+              "type": "string"
+            },
+            {
+              "id": "asgn-timestamp-warn",
+              "name": "check_timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Check BI Antivirus Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check BI Antivirus Status": {
+      "main": [
+        [
+          {
+            "node": "Is Status Healthy?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Status Healthy?": {
+      "main": [
+        [
+          {
+            "node": "Record Healthy Assessment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Warning Assessment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

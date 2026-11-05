@@ -1,0 +1,256 @@
+{
+  "name": "BI Antivirus - Scheduled Security Scan",
+  "nodes": [
+    {
+      "id": "node-schedule-trigger",
+      "name": "Schedule Trigger (Daily 02:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "notes": "Triggers daily automated Quick Scan. MIT License - Black Intel Cyber Defense."
+    },
+    {
+      "id": "node-set-scan-params",
+      "name": "Prepare Scan Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [420, 300],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "param-scan-type",
+              "name": "scan_type",
+              "value": "QUICK",
+              "type": "string"
+            },
+            {
+              "id": "param-triggered-by",
+              "name": "triggered_by",
+              "value": "n8n_scheduler",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-http-trigger-scan",
+      "name": "Trigger Authenticated Quick Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8765/api/v1/scan/quick",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-BI-API-Key",
+              "value": "={{ $env.BI_ANTIVIRUS_API_KEY || 'CONFIGURE_API_KEY' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"scan_type\": \"QUICK\",\n  \"source\": \"n8n_automated_schedule\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "node-wait-for-scan",
+      "name": "Wait for Initial Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [860, 300],
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      }
+    },
+    {
+      "id": "node-http-poll-status",
+      "name": "Poll Scan Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://127.0.0.1:8765/api/v1/scan/status/{{ $('Trigger Authenticated Quick Scan').item.json.scan_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-BI-API-Key",
+              "value": "={{ $env.BI_ANTIVIRUS_API_KEY || 'CONFIGURE_API_KEY' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "node-if-threats-found",
+      "name": "Check If Threats Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1300, 300],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.threats_count }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-set-clean-summary",
+      "name": "Record Clean Completion",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1540, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "res-status",
+              "name": "summary",
+              "value": "=Scan {{ $json.scan_id }} completed cleanly. Files inspected: {{ $json.files_scanned }}. Zero threats detected.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-set-threat-summary",
+      "name": "Record Threat Alert Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1540, 400],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "res-threat",
+              "name": "summary",
+              "value": "=WARNING: Scan {{ $json.scan_id }} discovered {{ $json.threats_count }} threats! Review BI Antivirus Dashboard.",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Daily 02:00)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Scan Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Scan Parameters": {
+      "main": [
+        [
+          {
+            "node": "Trigger Authenticated Quick Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Authenticated Quick Scan": {
+      "main": [
+        [
+          {
+            "node": "Wait for Initial Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Initial Processing": {
+      "main": [
+        [
+          {
+            "node": "Poll Scan Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Scan Status": {
+      "main": [
+        [
+          {
+            "node": "Check If Threats Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Threats Found": {
+      "main": [
+        [
+          {
+            "node": "Record Threat Alert Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Clean Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [
+    "bi-antivirus",
+    "security",
+    "scheduled-scan",
+    "mit-licensed"
+  ]
+}

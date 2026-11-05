@@ -1,0 +1,8 @@
+@echo off
+cd /d "%~dp0"
+set PYTHON_EXE=C:\Users\jitendersaini2006\AppData\Local\Programs\Python\Python312\python.exe
+if not exist "%PYTHON_EXE%" (
+    set PYTHON_EXE=python
+)
+"%PYTHON_EXE%" run_tests.py
+pause

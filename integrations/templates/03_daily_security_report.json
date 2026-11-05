@@ -1,0 +1,192 @@
+{
+  "name": "BI Antivirus - Daily Security Report",
+  "nodes": [
+    {
+      "id": "node-daily-schedule",
+      "name": "Daily Trigger (08:00 AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "notes": "Daily Security Report Digest. MIT License - Black Intel Cyber Defense."
+    },
+    {
+      "id": "node-fetch-latest-report",
+      "name": "Fetch Latest Security Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8765/api/v1/reports/latest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-BI-API-Key",
+              "value": "={{ $env.BI_ANTIVIRUS_API_KEY || 'CONFIGURE_API_KEY' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "node-verify-approval",
+      "name": "Verify Destination Configured & Approved",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ Boolean($env.DAILY_REPORT_APPROVED && ($env.REPORT_RECIPIENT_EMAIL || $env.TELEGRAM_CHAT_ID)) }}",
+              "value2": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-format-digest",
+      "name": "Format Daily Digest",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [920, 200],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fld-digest-subject",
+              "name": "digest_subject",
+              "value": "=[BI ANTIVIRUS] Daily Security Posture Digest: {{ $json.report_date }}",
+              "type": "string"
+            },
+            {
+              "id": "fld-digest-content",
+              "name": "digest_content",
+              "value": "=# 🛡️ BI Antivirus Daily Posture Report\n\n- **Status:** {{ $json.protection_status }}\n- **Definition Version:** {{ $json.definition_version }}\n- **Total Scanned (24h):** {{ $json.files_scanned_24h }}\n- **Threats Identified:** {{ $json.threats_found_24h }}\n- **Active Quarantine Items:** {{ $json.quarantine_count }}\n- **Windows Firewall Active:** {{ $json.firewall_active }}\n\nFull details available in local dashboard.\nStorage: D:\\bit defender\\reports",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-email-report",
+      "name": "Send Email Report (When Approved)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1160, 100],
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_FROM_EMAIL || 'reports@bi-antivirus.local' }}",
+        "toEmail": "={{ $env.REPORT_RECIPIENT_EMAIL || 'admin@bi-antivirus.local' }}",
+        "subject": "={{ $json.digest_subject }}",
+        "text": "={{ $json.digest_content }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "CONFIGURE_SMTP_CREDENTIAL",
+          "name": "SMTP Account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "node-telegram-report",
+      "name": "Send Telegram Digest (When Approved)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1160, 300],
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID || 'UNCONFIGURED_CHAT_ID' }}",
+        "text": "={{ $json.digest_content }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "CONFIGURE_TELEGRAM_CREDENTIAL",
+          "name": "Telegram Bot Token"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Daily Trigger (08:00 AM)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Latest Security Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Latest Security Report": {
+      "main": [
+        [
+          {
+            "node": "Verify Destination Configured & Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Destination Configured & Approved": {
+      "main": [
+        [
+          {
+            "node": "Format Daily Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Daily Digest": {
+      "main": [
+        [
+          {
+            "node": "Send Email Report (When Approved)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Telegram Digest (When Approved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": [
+    "bi-antivirus",
+    "security",
+    "daily-report",
+    "mit-licensed"
+  ]
+}
