@@ -148,6 +148,16 @@ class FileScanner:
         """
         return self._run_scan_pipeline([target_path], scan_type=scan_type, progress_cb=progress_cb)
 
+    def scan_custom(
+        self,
+        target_path: Path,
+        progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute scan on a custom folder or file path.
+        """
+        return self.scan_path(target_path, scan_type=SCAN_TYPE_CUSTOM, progress_cb=progress_cb)
+
     def scan_quick(
         self,
         progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,

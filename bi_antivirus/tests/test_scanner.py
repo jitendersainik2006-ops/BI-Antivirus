@@ -33,6 +33,13 @@ class TestFileScanner(unittest.TestCase):
         threat_names = [t["threat_name"] for t in res["threats"]]
         self.assertTrue(any("BI-Standard-Validation-Test-Signature" in name or "Ransomware" in name for name in threat_names))
 
+    def test_scan_custom_method(self):
+        """Verify FileScanner.scan_custom alias works identically for custom folders."""
+        res = self.scanner.scan_custom(FIXTURES_DIR)
+        self.assertEqual(res["status"], "COMPLETED")
+        self.assertGreater(res["files_scanned"], 0)
+        self.assertGreater(res["threats_count"], 0)
+
     def test_scan_history_recorded(self):
         sessions = self.history_db.get_recent_scans(limit=1)
         self.assertTrue(len(sessions) > 0)

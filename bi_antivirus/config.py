@@ -29,6 +29,7 @@ QUARANTINE_DB_PATH = DATA_DIR / "quarantine.db"
 EVENT_LOG_PATH = LOGS_DIR / "bi_security.log"
 WEBHOOK_LOG_PATH = LOGS_DIR / "webhook_events.log"
 API_KEY_FILE = DATA_DIR / "api_key.txt"
+VAULT_KEY_PATH = DATA_DIR / "vault_master.dpapi"
 
 # Ensure all directories exist on D: drive
 for _directory in (DATA_DIR, LOGS_DIR, QUARANTINE_DIR, QUARANTINE_VAULT_DIR, REPORTS_DIR, TEMPLATES_DIR):

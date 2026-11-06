@@ -38,6 +38,16 @@ class TestThreatDetector(unittest.TestCase):
         self.assertEqual(result["severity"], "CLEAN")
         self.assertEqual(result["risk_score"], 0)
 
+    def test_empty_zero_byte_file_false_positive_prevention(self):
+        empty_file = FIXTURES_DIR / "empty_file.txt"
+        self.assertTrue(empty_file.exists())
+        self.assertEqual(empty_file.stat().st_size, 0)
+        result = self.detector.analyze_file(empty_file)
+        self.assertFalse(result["is_threat"], "Empty (zero-byte) file must never trigger as threat")
+        self.assertEqual(result["severity"], "CLEAN")
+        self.assertEqual(result["risk_score"], 0)
+        self.assertEqual(result["file_size"], 0)
+
     def test_ransom_heuristic_detection(self):
         ransom_file = FIXTURES_DIR / "fake_ransom_heuristic.txt"
         self.assertTrue(ransom_file.exists())

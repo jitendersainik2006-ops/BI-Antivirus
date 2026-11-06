@@ -5,6 +5,8 @@ Multi-layered threat analysis:
 2. Exact signature database matching
 3. Deep regex and byte pattern scanning
 4. Safe heuristic indicators (Shannon entropy, double extensions, masquerading PE files, dropper scripts)
+5. Advanced PE structural analysis (Packer sections, suspicious import indicators)
+6. Authenticode Digital Signature verification via WinTrust (trust damping & anti-spoofing)
 Never executes untrusted files during analysis.
 """
 
@@ -25,6 +27,7 @@ from bi_antivirus.config import (
     FAMILY_DROPPER,
 )
 from bi_antivirus.database.signatures import SignatureDatabase
+from bi_antivirus.core.authenticode import AuthenticodeVerifier
 
 # Suspicious double extension regex pattern (e.g., document.pdf.exe, invoice.docx.vbs)
 DOUBLE_EXT_PATTERN = re.compile(
@@ -36,6 +39,28 @@ DOUBLE_EXT_PATTERN = re.compile(
 EXECUTABLE_EXTENSIONS = {
     ".exe", ".scr", ".pif", ".hta", ".cpl", ".wsf", ".vbs", ".vbe", ".bat", ".cmd", ".ps1", ".com", ".gadget"
 }
+
+# Known critical Windows system binary names (frequently spoofed by malware in user dirs)
+CRITICAL_WINDOWS_BINARIES = {
+    "svchost.exe", "explorer.exe", "csrss.exe", "lsass.exe", "services.exe",
+    "smss.exe", "winlogon.exe", "spoolsv.exe", "taskhostw.exe", "dwm.exe"
+}
+
+# Common packer / crypter section names
+KNOWN_PACKER_SECTIONS = [
+    b".upx0", b".upx1", b".upx2", b".aspack", b".themida", b".vmp0", b".vmp1",
+    b".mpress", b".petite", b".nsp0", b".pack", b".fsg"
+]
+
+# Suspicious process injection / evasion API tokens in binary imports
+SUSPICIOUS_API_IMPORTS = [
+    (b"VirtualAllocEx", "API.Memory.VirtualAllocEx", 25),
+    (b"WriteProcessMemory", "API.Injection.WriteProcessMemory", 25),
+    (b"CreateRemoteThread", "API.Injection.CreateRemoteThread", 30),
+    (b"NtUnmapViewOfSection", "API.Hollowing.NtUnmapViewOfSection", 35),
+    (b"QueueUserAPC", "API.Injection.QueueUserAPC", 25),
+    (b"SetWindowsHookEx", "API.Spyware.SetWindowsHookEx", 20),
+]
 
 # Suspicious script patterns for heuristic analysis
 HEURISTIC_SCRIPT_PATTERNS = [
@@ -103,25 +128,43 @@ class ThreatDetector:
     def inspect_pe_header(header_bytes: bytes) -> Dict[str, Any]:
         """
         Safely inspect PE/DOS headers for executable structures without executing.
-        Checks for MZ header and PE signature offset.
+        Checks for MZ header, PE signature offset, section headers, and packer signatures.
         """
         is_pe = False
-        is_dll = False
-        subsystem = None
+        pe_offset = 0
+        num_sections = 0
+        detected_sections = []
 
         if len(header_bytes) >= 64 and header_bytes[:2] == b"MZ":
-            # Offset to PE signature is located at 0x3C in DOS header
             try:
                 pe_offset = int.from_bytes(header_bytes[0x3C:0x40], byteorder="little")
                 if len(header_bytes) >= pe_offset + 4:
                     if header_bytes[pe_offset:pe_offset+4] == b"PE\x00\x00":
                         is_pe = True
+                        # COFF File Header is at pe_offset + 4
+                        if len(header_bytes) >= pe_offset + 24:
+                            num_sections = int.from_bytes(header_bytes[pe_offset+6:pe_offset+8], byteorder="little")
+                            # Optional header size at pe_offset + 20
+                            opt_hdr_size = int.from_bytes(header_bytes[pe_offset+20:pe_offset+22], byteorder="little")
+                            sec_table_offset = pe_offset + 24 + opt_hdr_size
+                            # Scan up to 16 section headers
+                            for s_idx in range(min(num_sections, 16)):
+                                s_start = sec_table_offset + (s_idx * 40)
+                                if len(header_bytes) >= s_start + 8:
+                                    raw_name = header_bytes[s_start:s_start+8].split(b"\x00")[0]
+                                    detected_sections.append(raw_name.lower())
             except Exception:
                 pass
+
+        # Check for known packer sections
+        is_packed = any(sec in KNOWN_PACKER_SECTIONS for sec in detected_sections)
 
         return {
             "has_mz": header_bytes[:2] == b"MZ",
             "is_pe": is_pe,
+            "num_sections": num_sections,
+            "sections": [s.decode("utf-8", errors="ignore") for s in detected_sections],
+            "is_packed": is_packed,
         }
 
     def analyze_file(self, file_path: Path) -> Dict[str, Any]:
@@ -130,6 +173,7 @@ class ThreatDetector:
         Returns detailed report dictionary.
         """
         path = Path(file_path)
+        ext = path.suffix.lower()
         if not path.is_file():
             return {
                 "file_path": str(path),
@@ -158,6 +202,21 @@ class ThreatDetector:
                 "is_threat": False,
                 "error": f"Failed reading file for hash: {e}",
                 "severity": SEVERITY_CLEAN,
+            }
+
+        # Empty (zero-byte) files contain no executable payload or structure; classify as CLEAN
+        if file_size == 0:
+            return {
+                "file_path": str(path),
+                "file_name": path.name,
+                "file_hash": sha256_hash,
+                "md5_hash": md5_hash,
+                "file_size": 0,
+                "is_threat": False,
+                "severity": SEVERITY_CLEAN,
+                "risk_score": 0,
+                "heuristic_flags": [],
+                "authenticode": {"is_signed": False, "is_trusted": False, "status": "ZERO_BYTE_FILE"},
             }
 
         # Step 2: Exact Signature Hash Lookup
@@ -195,22 +254,33 @@ class ThreatDetector:
         # Step 3: Pattern & Regex Signature Matching
         pattern_matches = self.sig_db.match_patterns(sample_bytes)
         if pattern_matches:
-            top_match = pattern_matches[0]
-            return {
-                "file_path": str(path),
-                "file_name": path.name,
-                "file_hash": sha256_hash,
-                "md5_hash": md5_hash,
-                "file_size": file_size,
-                "is_threat": True,
-                "threat_name": top_match["threat_name"],
-                "threat_family": top_match["threat_family"],
-                "severity": top_match["severity"],
-                "detection_type": "SIGNATURE_PATTERN",
-                "description": top_match["description"],
-                "risk_score": 90,
-                "heuristic_flags": [m["rule_name"] for m in pattern_matches],
-            }
+            # Prevent false positives: Command-line execution patterns should not flag non-executable markdown/documentation
+            doc_exts = {".md", ".markdown", ".rst"}
+            cli_rules = {"RULE_RANSOM_SHADOW_DELETE", "RULE_POWERSHELL_SUSPICIOUS_EXEC", "RULE_DOWNLOAD_CRADLE_BITSADMIN"}
+            
+            valid_matches = []
+            for m in pattern_matches:
+                if ext in doc_exts and m.get("rule_name") in cli_rules:
+                    continue
+                valid_matches.append(m)
+
+            if valid_matches:
+                top_match = valid_matches[0]
+                return {
+                    "file_path": str(path),
+                    "file_name": path.name,
+                    "file_hash": sha256_hash,
+                    "md5_hash": md5_hash,
+                    "file_size": file_size,
+                    "is_threat": True,
+                    "threat_name": top_match["threat_name"],
+                    "threat_family": top_match["threat_family"],
+                    "severity": top_match["severity"],
+                    "detection_type": "SIGNATURE_PATTERN",
+                    "description": top_match["description"],
+                    "risk_score": 90,
+                    "heuristic_flags": [m["rule_name"] for m in valid_matches],
+                }
 
         # Step 4: Safe Heuristic Analysis
         if not self.enable_heuristics:
@@ -235,7 +305,7 @@ class ThreatDetector:
             heuristic_flags.append(f"SuspiciousDoubleExtension:{path.name}")
 
         # Heuristic 4.2: Masquerading PE Executable (e.g. file is named .png or .jpg but starts with MZ/PE)
-        pe_info = self.inspect_pe_header(sample_bytes[:1024])
+        pe_info = self.inspect_pe_header(sample_bytes[:4096])
         non_pe_extensions = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".txt", ".csv", ".docx", ".xlsx"}
         if ext in non_pe_extensions and pe_info["is_pe"]:
             risk_score += 80
@@ -249,7 +319,24 @@ class ThreatDetector:
                 risk_score += 35
                 heuristic_flags.append(f"HighEntropyPacking:{entropy}")
 
-        # Heuristic 4.4: Embedded Script & Dropper Inspection
+        # Heuristic 4.4: Known Packer / Crypter Sections
+        if pe_info.get("is_packed"):
+            risk_score += 30
+            heuristic_flags.append(f"PackerSectionDetected:{','.join(pe_info['sections'])}")
+
+        # Heuristic 4.5: Suspicious Injection API Import Signatures
+        if pe_info["is_pe"]:
+            injection_hits = 0
+            for api_bytes, rule_id, weight in SUSPICIOUS_API_IMPORTS:
+                if api_bytes in sample_bytes:
+                    injection_hits += 1
+                    risk_score += weight
+                    heuristic_flags.append(rule_id)
+            if injection_hits >= 3:
+                risk_score += 25
+                heuristic_flags.append("Heuristic.Injection.ProcessHollowingProfile")
+
+        # Heuristic 4.6: Embedded Script & Dropper Inspection
         try:
             sample_text = sample_bytes.decode("utf-8", errors="ignore")
             for pattern_re, rule_id, weight in HEURISTIC_SCRIPT_PATTERNS:
@@ -258,6 +345,28 @@ class ThreatDetector:
                     heuristic_flags.append(rule_id)
         except Exception:
             pass
+
+        # Heuristic 4.7: Critical Windows Binary Masquerading Check
+        # Detect if a file named like svchost.exe or lsass.exe is located outside Windows System directories
+        clean_name = path.name.lower()
+        if clean_name in CRITICAL_WINDOWS_BINARIES:
+            parent_str = str(path.parent).lower()
+            if "system32" not in parent_str and "syswow64" not in parent_str and "winsxs" not in parent_str:
+                risk_score += 75
+                heuristic_flags.append(f"MasqueradingSystemBinary:{clean_name}")
+
+        # Authenticode Signature Verification & Trust Damping
+        authenticode_res = {"is_signed": False, "is_trusted": False, "status": "NOT_CHECKED"}
+        if pe_info["is_pe"] or ext in EXECUTABLE_EXTENSIONS:
+            authenticode_res = AuthenticodeVerifier.verify_file_signature(path)
+            # If the binary has a trusted, valid digital signature from a trusted root CA:
+            if authenticode_res.get("is_trusted") is True:
+                # Substantially damp entropy/generic false positive scores for trusted signed software
+                risk_score = max(0, risk_score - 45)
+            elif authenticode_res.get("status") in ("TAMPERED_DIGEST", "EXPLICITLY_DISTRUSTED"):
+                # If signature was deliberately tampered or explicitly revoked, elevate risk immediately
+                risk_score += 85
+                heuristic_flags.append(f"UntrustedSignature:{authenticode_res['status']}")
 
         # Risk Classification Assessment
         if risk_score >= 70:
@@ -276,6 +385,7 @@ class ThreatDetector:
                 "description": f"Heuristic threat score: {risk_score}/100. Flags: {', '.join(heuristic_flags[:3])}",
                 "risk_score": min(risk_score, 100),
                 "heuristic_flags": heuristic_flags,
+                "authenticode": authenticode_res,
             }
         elif risk_score >= 40:
             return {
@@ -292,6 +402,7 @@ class ThreatDetector:
                 "description": f"Suspicious file indicators detected (Score: {risk_score}/100).",
                 "risk_score": risk_score,
                 "heuristic_flags": heuristic_flags,
+                "authenticode": authenticode_res,
             }
 
         return {
@@ -304,4 +415,5 @@ class ThreatDetector:
             "severity": SEVERITY_CLEAN,
             "risk_score": risk_score,
             "heuristic_flags": heuristic_flags,
+            "authenticode": authenticode_res,
         }

@@ -138,13 +138,6 @@ class SignatureDatabase:
                     "Standard test file signature",
                 ),
                 (
-                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                    "Empty-Payload-ZeroByte",
-                    FAMILY_TEST_VIRUS,
-                    SEVERITY_LOW,
-                    "Empty file hash index for anomaly tracking",
-                ),
-                (
                     "b026324c6904b2a9cb4b88d6d61c81d1ff6f6c91a0c71a393fb7c6a91703ab34",
                     "BI-Simulated-Trojan-TestPayload",
                     FAMILY_TROJAN,
@@ -159,6 +152,9 @@ class SignatureDatabase:
                     "Internal harmless test payload for ransomware recovery tests",
                 ),
             ]
+
+            # Purge deprecated seed signatures that could cause false positives on empty files
+            cursor.execute("DELETE FROM hash_signatures WHERE threat_name = 'Empty-Payload-ZeroByte' OR sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'")
 
             for h, name, fam, sev, desc in seeds_hashes:
                 cursor.execute("""

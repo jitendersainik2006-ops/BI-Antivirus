@@ -9,6 +9,8 @@ data/api_key.txt
 *.key
 *.token
 *.secret
+*.dpapi
+data/vault_master.*
 
 # 2. Environment Files & Secret Configurations
 *.env

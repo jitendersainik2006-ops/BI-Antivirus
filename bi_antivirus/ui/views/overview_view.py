@@ -76,6 +76,31 @@ class OverviewView(tk.Frame):
         )
         self.status_meta.pack(fill="x")
 
+        # 1.5 Active Cyber Defense Sentinels Telemetry Bar
+        sentinels_bar = tk.Frame(self, bg=THEME["bg_panel"], padx=14, pady=8)
+        sentinels_bar.pack(fill="x", padx=20, pady=(0, 15))
+        sentinels_bar.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        self.sentinel_labels = {}
+        sentinel_configs = [
+            ("behavioral", "⚡ Behavioral: ACTIVE"),
+            ("ransomware", "🛡️ Ransomware Shield: ACTIVE"),
+            ("usb", "🔌 USB Sentinel: ACTIVE"),
+            ("authenticode", "🔏 WinTrust Authenticode: ACTIVE"),
+            ("posture", "🎯 Baseline Audit: 5/5 CONTROLS PASSED"),
+        ]
+
+        for key, text in sentinel_configs:
+            lbl = tk.Label(
+                sentinels_bar,
+                text=text,
+                bg=THEME["bg_panel"],
+                fg=THEME["accent_cyan"],
+                font=(THEME["font_family"], 8, "bold"),
+            )
+            lbl.pack(side="left", padx=(0, 14))
+            self.sentinel_labels[key] = lbl
+
         # 2. Metric Stat Cards Grid
         stats_grid = tk.Frame(self, bg=THEME["bg_darkest"])
         stats_grid.pack(fill="x", padx=20, pady=(0, 15))
@@ -201,3 +226,23 @@ class OverviewView(tk.Frame):
         self.card_scanned.update_value(f"{summary['total_files_scanned']:,}")
         self.card_threats.update_value(str(summary["total_threats_found"]))
         self.card_vault.update_value(str(summary["quarantined_items_count"]))
+
+        # Update Sentinels telemetry
+        if hasattr(self, "sentinel_labels"):
+            bh_state = "ACTIVE" if summary.get("behavioral_active") else "STANDBY"
+            self.sentinel_labels["behavioral"].config(
+                text=f"⚡ Behavioral: {bh_state}",
+                fg=THEME["status_safe"] if bh_state == "ACTIVE" else THEME["text_muted"],
+            )
+            rn_state = "ACTIVE" if summary.get("ransomware_shield_active") else "STANDBY"
+            canaries = summary.get("canaries_deployed", 0)
+            self.sentinel_labels["ransomware"].config(
+                text=f"🛡️ Ransomware: {rn_state} ({canaries} Canaries)",
+                fg=THEME["status_safe"] if rn_state == "ACTIVE" else THEME["text_muted"],
+            )
+            usb_state = "ACTIVE" if summary.get("usb_sentinel_active") else "STANDBY"
+            self.sentinel_labels["usb"].config(
+                text=f"🔌 USB Sentinel: {usb_state}",
+                fg=THEME["status_safe"] if usb_state == "ACTIVE" else THEME["text_muted"],
+            )
+

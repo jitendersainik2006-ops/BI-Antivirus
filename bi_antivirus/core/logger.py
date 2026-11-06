@@ -1,14 +1,15 @@
 """
-BI Antivirus - Security Event Logger & Report Generator
-Maintains persistent, tamper-evident audit logs on D: drive (logs/bi_security.log)
-and generates professional security scan reports and executive summaries.
+BI Antivirus - Structured Audit Logger & Security Report Generator
+Maintains audit logs of security events and compiles formal Markdown assessment reports on D: drive.
+Strictly non-destructive and privacy-focused: keeps all telemetry local.
 """
 
 import os
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List, Optional
 
 from bi_antivirus.config import (
     EVENT_LOG_PATH,
@@ -18,40 +19,38 @@ from bi_antivirus.config import (
     ENGINE_VERSION,
 )
 
+logger = logging.getLogger("bi_antivirus.logger")
+
 
 class SecurityLogger:
-    """Centralized security event logger and report generation engine."""
+    """Handles structured event logging to bi_security.log and generates Markdown reports."""
 
     def __init__(self, log_path: Optional[Path] = None):
         self.log_path = Path(log_path or EVENT_LOG_PATH)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-        self._setup_file_handler()
 
-    def _setup_file_handler(self) -> None:
-        self.logger = logging.getLogger("bi_security_audit")
-        self.logger.setLevel(logging.INFO)
-        if not self.logger.handlers:
-            fh = logging.FileHandler(str(self.log_path), encoding="utf-8")
-            fmt = logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-            fh.setFormatter(fmt)
-            self.logger.addHandler(fh)
+    def log_event(self, level: str, source: str, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Record a structured security event entry to the audit log.
+        Format: [TIMESTAMP] [LEVEL] [SOURCE] Message | JSON_DETAILS
+        """
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        entry = f"[{timestamp}] [{level.upper()}] [{source.upper()}] {message}"
+        if details:
+            try:
+                entry += f" | {json.dumps(details)}"
+            except Exception:
+                pass
+        entry += "\n"
 
-    def log_event(self, level: str, category: str, message: str, details: Optional[Dict[str, Any]] = None) -> None:
-        """Log a structured security audit event."""
-        detail_str = f" | Details: {details}" if details else ""
-        formatted = f"[{category.upper()}] {message}{detail_str}"
-        lvl = level.upper()
-        if lvl in ("CRITICAL", "ALERT"):
-            self.logger.critical(formatted)
-        elif lvl == "WARN" or lvl == "WARNING":
-            self.logger.warning(formatted)
-        elif lvl == "ERROR":
-            self.logger.error(formatted)
-        else:
-            self.logger.info(formatted)
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(entry)
+        except Exception as e:
+            logger.error(f"Failed to append to security log: {e}")
 
-    def read_recent_logs(self, max_lines: int = 100) -> List[str]:
-        """Read latest lines from security audit log."""
+    def read_recent_events(self, max_lines: int = 50) -> List[str]:
+        """Fetch the most recent audit log entries for display in dashboard."""
         if not self.log_path.exists():
             return []
         try:
@@ -67,6 +66,7 @@ class SecurityLogger:
         db_stats: Optional[Dict[str, Any]] = None,
         quarantine_items: Optional[List[Dict[str, Any]]] = None,
         firewall_status: Optional[Dict[str, Any]] = None,
+        vulnerability_report: Optional[Dict[str, Any]] = None,
     ) -> Path:
         """
         Produce a comprehensive, timestamped Markdown Security Report in reports/ directory.
@@ -79,6 +79,7 @@ class SecurityLogger:
         scan = scan_summary or {}
         sigs = db_stats or {}
         fw = firewall_status or {}
+        vuln = vulnerability_report or {}
 
         content = f"""# {APP_NAME} Security Assessment Report
 **Platform:** {APP_NAME} {APP_VERSION} (Engine: {ENGINE_VERSION})  
@@ -93,6 +94,7 @@ class SecurityLogger:
 - **Database Version:** {sigs.get("version", "Current")}
 - **Files Quarantined in Vault:** {quarantine_count}
 - **Windows Firewall Active:** {fw.get("all_active", "Audited")}
+- **System Posture Score:** {vuln.get("posture_score", "N/A")}/100 ({vuln.get("posture_rating", "Audited")})
 
 ---
 
@@ -137,14 +139,31 @@ class SecurityLogger:
 - Private Profile: **{fw.get('Private', 'N/A')}**
 - Public Profile: **{fw.get('Public', 'N/A')}**
 - *Safety Notice: Windows Defender Firewall and Windows Defender are strictly monitored and preserved.*
+"""
 
+        if vuln.get("checks"):
+            content += f"""
 ---
 
-## 5. Security Recommendations
-1. Ensure Real-Time Guard remains activated to monitor incoming files in Downloads and Temp.
+## 5. System Vulnerability & Posture Assessment
+- Security Posture Score: **{vuln.get('posture_score', 100)}/100** ({vuln.get('posture_rating', 'GOOD')})
+- Checks Passed: **{vuln.get('passed_checks', 0)} / {vuln.get('total_checks', 0)}**
+
+| Security Control | Result | Status | Recommendation |
+|------------------|--------|--------|----------------|
+"""
+            for chk in vuln["checks"]:
+                content += f"| {chk['check']} | {chk['value']} | **{chk['status']}** | {chk['recommendation']} |\n"
+
+        content += f"""
+---
+
+## 6. Security Recommendations
+1. Ensure Real-Time Guard and Behavioral Monitor remain activated.
 2. Regularly execute the scheduled Daily Quick Scan.
 3. Review quarantined files and approve restoration only for confirmed internal files.
 4. Keep definitions updated using the integrated Update Manager.
+5. Address any high-priority vulnerability audit findings.
 
 *Report produced by {APP_NAME} Black Intel Security Engine.*
 """

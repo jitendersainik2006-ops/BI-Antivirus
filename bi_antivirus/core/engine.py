@@ -1,8 +1,9 @@
 """
 BI Antivirus - Master Antivirus Engine Coordinator
-Unifies the 12 modular subsystems into an integrated cyber defense platform:
+Unifies the complete multi-layer cyber defense platform:
 Scanner, Detection Engine, Quarantine Vault, Signature DB, History DB,
-Real-Time Guard, Web Shield, Firewall Auditor, Scheduler, Updater, Logger,
+Real-Time Guard, Behavioral Monitor, Ransomware Shield, USB Sentinel,
+Vulnerability Auditor, Web Shield, Firewall Auditor, Scheduler, Updater, Logger,
 Threat Event Dispatcher, Voice Sentinel, and Local REST API.
 """
 
@@ -28,7 +29,11 @@ from bi_antivirus.core.quarantine import QuarantineManager
 from bi_antivirus.core.updater import UpdateManager
 from bi_antivirus.core.scheduler import ScanScheduler
 from bi_antivirus.core.logger import SecurityLogger
+from bi_antivirus.core.vulnerability import VulnerabilityAuditor
 from bi_antivirus.monitors.realtime import RealTimeGuard
+from bi_antivirus.monitors.behavioral import BehavioralMonitor
+from bi_antivirus.monitors.ransomware_shield import RansomwareShield
+from bi_antivirus.monitors.usb_sentinel import USBSentinel
 from bi_antivirus.monitors.web_protection import WebProtection
 from bi_antivirus.monitors.firewall_monitor import FirewallMonitor
 from bi_antivirus.monitors.voice_alert import voice_service, VoiceAlertService
@@ -58,7 +63,7 @@ class AntivirusEngine:
         self.web_shield = WebProtection(signature_db=self.sig_db)
         self.firewall_monitor = FirewallMonitor()
 
-        # 6. Real-Time Guard
+        # 6. Real-Time Filesystem Guard
         self.realtime_guard = RealTimeGuard(
             detector=self.detector,
             quarantine_mgr=self.quarantine_mgr,
@@ -66,23 +71,44 @@ class AntivirusEngine:
             on_threat_detected=self._on_realtime_threat,
         )
 
-        # 7. Update Manager
+        # 7. Behavioral Process Sentinel
+        self.behavioral_monitor = BehavioralMonitor(
+            history_db=self.history_db,
+            on_anomaly_detected=self._on_behavioral_threat,
+        )
+
+        # 8. Advanced Ransomware Shield & Canary Decoys
+        self.ransomware_shield = RansomwareShield(
+            history_db=self.history_db,
+            on_ransomware_alert=self._on_ransomware_threat,
+        )
+
+        # 9. USB & Removable Media Sentinel
+        self.usb_sentinel = USBSentinel(
+            history_db=self.history_db,
+            on_threat_detected=self._on_usb_threat,
+        )
+
+        # 10. Vulnerability Auditor
+        self.vulnerability_auditor = VulnerabilityAuditor
+
+        # 11. Update Manager
         self.updater = UpdateManager(sig_db=self.sig_db)
 
-        # 8. Automated Scheduler
+        # 12. Automated Scheduler
         self.scheduler = ScanScheduler(on_trigger_scan=self._on_scheduled_scan_trigger)
 
-        # 9. Voice Alert Sentinel
+        # 13. Voice Alert Sentinel
         self.voice: VoiceAlertService = voice_service
 
-        # 10. Webhook & Automation Dispatcher
+        # 14. Webhook & Automation Dispatcher
         self.dispatcher: ThreatEventDispatcher = event_dispatcher
 
-        # 11. Loopback-Only Local REST API Server
+        # 15. Loopback-Only Local REST API Server
         self.api_server = LocalAPIServer(self)
 
         # Live Status
-        self.system_status = "PROTECTED"  # "PROTECTED", "SCANNING", "THREAT_DETECTED", "WARNING"
+        self.system_status = "PROTECTED"
         self.active_scan_thread: Optional[threading.Thread] = None
 
         # Callbacks for UI updates
@@ -98,6 +124,18 @@ class AntivirusEngine:
         if settings.get("realtime_protection_enabled", True):
             self.realtime_guard.start()
             self.sec_logger.log_event("INFO", "REALTIME", "Real-Time Protection Guard started.")
+
+        # Start Behavioral Sentinel
+        self.behavioral_monitor.start()
+        self.sec_logger.log_event("INFO", "BEHAVIORAL", "Behavioral Process Monitor started.")
+
+        # Start Ransomware Shield
+        self.ransomware_shield.start()
+        self.sec_logger.log_event("INFO", "RANSOMWARE", "Ransomware Shield & Canaries active.")
+
+        # Start USB Sentinel
+        self.usb_sentinel.start()
+        self.sec_logger.log_event("INFO", "USB_SENTINEL", "USB Removable Media Sentinel started.")
 
         # Start Automated Scheduler
         self.scheduler.start()
@@ -117,6 +155,9 @@ class AntivirusEngine:
         self.api_server.stop()
         self.dispatcher.stop()
         self.realtime_guard.stop()
+        self.behavioral_monitor.stop()
+        self.ransomware_shield.stop()
+        self.usb_sentinel.stop()
         self.scheduler.stop()
         if self.scanner.is_scanning:
             self.scanner.cancel_scan()
@@ -149,8 +190,78 @@ class AntivirusEngine:
             details=threat,
         )
 
-        # Dispatch sanitized event to local automation & voice
         self.dispatcher.emit_threat_event(threat, scan_id="REALTIME_GUARD")
+
+        if self.on_threat_found:
+            try:
+                self.on_threat_found(threat)
+            except Exception:
+                pass
+        self._update_system_status()
+
+    def _on_behavioral_threat(self, anomaly: Dict[str, Any]) -> None:
+        """Handle anomaly flagged by behavioral process monitor."""
+        self.system_status = "THREAT_DETECTED"
+        self.sec_logger.log_event(
+            "ALERT",
+            "BEHAVIORAL",
+            f"Behavioral anomaly: {anomaly.get('process_name')} (PID: {anomaly.get('pid')})",
+            details=anomaly,
+        )
+
+        threat_dict = {
+            "file_path": f"Process:{anomaly.get('process_name')}",
+            "threat_name": f"Behavioral.{anomaly.get('indicators', ['Suspicious'])[0]}",
+            "severity": anomaly.get("severity", "HIGH"),
+            "file_hash": "BEHAVIORAL_ANOMALY",
+            "description": anomaly.get("summary", ""),
+        }
+        self.dispatcher.emit_threat_event(threat_dict, scan_id="BEHAVIORAL")
+
+        if self.on_threat_found:
+            try:
+                self.on_threat_found(threat_dict)
+            except Exception:
+                pass
+        self._update_system_status()
+
+    def _on_ransomware_threat(self, alert_data: Dict[str, Any]) -> None:
+        """Handle alert from Ransomware Shield."""
+        self.system_status = "THREAT_DETECTED"
+        self.sec_logger.log_event(
+            "CRITICAL",
+            "RANSOMWARE_SHIELD",
+            f"Ransomware activity intercepted: {alert_data.get('summary')}",
+            details=alert_data,
+        )
+
+        threat_dict = {
+            "file_path": alert_data.get("file_path", "RANSOMWARE_TARGET"),
+            "threat_name": alert_data.get("threat_name", "Ransomware.Attack"),
+            "severity": alert_data.get("severity", "CRITICAL"),
+            "file_hash": "RANSOMWARE_DETECTION",
+            "description": alert_data.get("summary", ""),
+        }
+        self.dispatcher.emit_threat_event(threat_dict, scan_id="RANSOMWARE_SHIELD")
+
+        if self.on_threat_found:
+            try:
+                self.on_threat_found(threat_dict)
+            except Exception:
+                pass
+        self._update_system_status()
+
+    def _on_usb_threat(self, threat: Dict[str, Any]) -> None:
+        """Handle threat found on removable media."""
+        self.system_status = "THREAT_DETECTED"
+        self.sec_logger.log_event(
+            "ALERT",
+            "USB_SENTINEL",
+            f"Removable media threat: {threat.get('threat_name')} at {threat.get('file_path')}",
+            details=threat,
+        )
+
+        self.dispatcher.emit_threat_event(threat, scan_id="USB_SENTINEL")
 
         if self.on_threat_found:
             try:
@@ -178,125 +289,120 @@ class AntivirusEngine:
         self.scanner.current_session_id = session_id
 
         def _worker():
-            self._update_system_status()
-            self.sec_logger.log_event("INFO", "SCANNER", f"Quick Scan started ({session_id}).")
-            res = self.scanner.scan_quick(progress_cb=progress_cb)
-            self._update_system_status()
-            self.sec_logger.log_event(
-                "INFO",
-                "SCANNER",
-                f"Quick Scan completed. Files: {res['files_scanned']}, Threats: {res['threats_count']}",
-            )
+            try:
+                self._update_system_status()
+                self.sec_logger.log_event("INFO", "SCANNER", f"Quick Scan started ({session_id}).")
+                res = self.scanner.scan_quick(progress_cb=progress_cb)
+                self._update_system_status()
+                self.sec_logger.log_event(
+                    "INFO",
+                    "SCANNER",
+                    f"Quick Scan completed. Files: {res['files_scanned']}, Threats: {res['threats_count']}",
+                )
 
-            # Emit events for threats discovered
-            for t in res.get("threats", []):
-                self.dispatcher.emit_threat_event(t, scan_id=res["session_id"])
+                for t in res.get("threats", []):
+                    self.dispatcher.emit_threat_event(t, scan_id=res["session_id"])
 
-            # Voice announcement
-            self.voice.announce_scan_completed(res["files_scanned"], res["threats_count"])
+                self.voice.announce_scan_completed(res["files_scanned"], res["threats_count"])
+            except Exception as e:
+                self.sec_logger.log_event("ERROR", "SCANNER", f"Quick Scan error: {e}")
+                self._update_system_status()
 
         self.active_scan_thread = threading.Thread(target=_worker, daemon=True, name="BI-QuickScanThread")
         self.active_scan_thread.start()
         return session_id
 
-    def start_full_scan(self, progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
-        """Start Full Scan in background thread."""
+    def start_full_scan(self, progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None) -> str:
+        """Start Full System Scan in dedicated background thread."""
         if self.scanner.is_scanning:
-            return
+            return self.scanner.current_session_id
+
+        session_id = f"SCAN-{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4]}"
+        self.scanner.current_session_id = session_id
 
         def _worker():
-            self._update_system_status()
-            self.sec_logger.log_event("INFO", "SCANNER", "Full Scan started.")
-            res = self.scanner.scan_full(progress_cb=progress_cb)
-            self._update_system_status()
-            self.sec_logger.log_event(
-                "INFO",
-                "SCANNER",
-                f"Full Scan completed. Files: {res['files_scanned']}, Threats: {res['threats_count']}",
-            )
+            try:
+                self._update_system_status()
+                self.sec_logger.log_event("INFO", "SCANNER", f"Full Scan started ({session_id}).")
+                res = self.scanner.scan_full(progress_cb=progress_cb)
+                self._update_system_status()
+                self.sec_logger.log_event(
+                    "INFO",
+                    "SCANNER",
+                    f"Full Scan completed. Files: {res['files_scanned']}, Threats: {res['threats_count']}",
+                )
 
-            for t in res.get("threats", []):
-                self.dispatcher.emit_threat_event(t, scan_id=res["session_id"])
+                for t in res.get("threats", []):
+                    self.dispatcher.emit_threat_event(t, scan_id=res["session_id"])
 
-            self.voice.announce_scan_completed(res["files_scanned"], res["threats_count"])
+                self.voice.announce_scan_completed(res["files_scanned"], res["threats_count"])
+            except Exception as e:
+                self.sec_logger.log_event("ERROR", "SCANNER", f"Full Scan error: {e}")
+                self._update_system_status()
 
         self.active_scan_thread = threading.Thread(target=_worker, daemon=True, name="BI-FullScanThread")
         self.active_scan_thread.start()
+        return session_id
 
     def start_custom_scan(
-        self, target_path: Path, progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None
-    ) -> None:
-        """Start Custom Folder/File Scan in background thread."""
+        self,
+        target_path: Path,
+        progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> str:
+        """Start Custom Path Scan."""
         if self.scanner.is_scanning:
-            return
+            return self.scanner.current_session_id
+
+        session_id = f"SCAN-{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4]}"
+        self.scanner.current_session_id = session_id
 
         def _worker():
-            self._update_system_status()
-            self.sec_logger.log_event("INFO", "SCANNER", f"Custom Scan started on target: {target_path}")
-            res = self.scanner.scan_path(target_path, progress_cb=progress_cb)
-            self._update_system_status()
-            self.sec_logger.log_event(
-                "INFO",
-                "SCANNER",
-                f"Custom Scan completed. Files: {res['files_scanned']}, Threats: {res['threats_count']}",
-            )
+            try:
+                self._update_system_status()
+                self.sec_logger.log_event("INFO", "SCANNER", f"Custom Scan started on {target_path} ({session_id}).")
+                res = self.scanner.scan_custom(target_path, progress_cb=progress_cb)
+                self._update_system_status()
+                self.sec_logger.log_event(
+                    "INFO",
+                    "SCANNER",
+                    f"Custom Scan completed. Files: {res['files_scanned']}, Threats: {res['threats_count']}",
+                )
 
-            for t in res.get("threats", []):
-                self.dispatcher.emit_threat_event(t, scan_id=res["session_id"])
+                for t in res.get("threats", []):
+                    self.dispatcher.emit_threat_event(t, scan_id=res["session_id"])
 
-            self.voice.announce_scan_completed(res["files_scanned"], res["threats_count"])
+                self.voice.announce_scan_completed(res["files_scanned"], res["threats_count"])
+            except Exception as e:
+                self.sec_logger.log_event("ERROR", "SCANNER", f"Custom Scan error: {e}")
+                self._update_system_status()
 
         self.active_scan_thread = threading.Thread(target=_worker, daemon=True, name="BI-CustomScanThread")
         self.active_scan_thread.start()
+        return session_id
 
-    def cancel_scan(self) -> None:
-        """Cancel currently active scan."""
+    def stop_scan(self) -> None:
+        """Cancel the ongoing scan."""
         if self.scanner.is_scanning:
             self.scanner.cancel_scan()
-            self.sec_logger.log_event("WARN", "SCANNER", "Scan cancellation requested by user.")
+            self.sec_logger.log_event("WARNING", "SCANNER", "Active scan cancelled by user.")
+            self._update_system_status()
 
-    # Quarantine Management API
-    def quarantine_threat(self, threat: Dict[str, Any]) -> Dict[str, Any]:
-        """Safely quarantine a detected threat."""
-        file_path = Path(threat["file_path"])
-        res = self.quarantine_mgr.quarantine_file(file_path, threat)
-        if res.get("success"):
-            self.sec_logger.log_event(
-                "ALERT",
-                "QUARANTINE",
-                f"Quarantined {threat.get('threat_name')} from {file_path} to vault {res.get('quarantine_id')}",
-            )
-            # Update threat record in history if available
-            history_recs = self.history_db.get_threat_history(limit=5)
-            for rec in history_recs:
-                if rec["file_path"] == str(file_path):
-                    self.history_db.update_threat_action(rec["id"], "QUARANTINED")
-                    break
-        self._update_system_status()
-        return res
+    def run_vulnerability_audit(self) -> Dict[str, Any]:
+        """Execute on-demand system vulnerability assessment."""
+        report = self.vulnerability_auditor.run_full_vulnerability_audit()
+        self.sec_logger.log_event(
+            "INFO",
+            "VULNERABILITY",
+            f"Vulnerability audit completed: Score {report['posture_score']}/100 ({report['posture_rating']}), {report['vulnerabilities_found']} issue(s).",
+        )
+        return report
 
-    def restore_threat(self, quarantine_id: str, custom_target: Optional[Path] = None) -> Tuple[bool, str]:
-        """Safely restore a quarantined file."""
-        ok, msg = self.quarantine_mgr.restore_file(quarantine_id, custom_target)
-        if ok:
-            self.sec_logger.log_event("INFO", "QUARANTINE", f"Restored {quarantine_id}: {msg}")
-        return ok, msg
-
-    def purge_quarantined_threat(self, quarantine_id: str) -> Tuple[bool, str]:
-        """Safely delete quarantined file permanently (upon explicit user confirmation)."""
-        ok, msg = self.quarantine_mgr.purge_file(quarantine_id)
-        if ok:
-            self.sec_logger.log_event("INFO", "QUARANTINE", f"Purged {quarantine_id} from vault.")
-        return ok, msg
-
-    # Reports & Diagnostics API
-    def generate_security_report(self) -> Path:
-        """Create structured Markdown assessment report on D: drive."""
+    def generate_current_report(self) -> Path:
+        """Compile and write comprehensive Markdown security assessment report on D: drive."""
         scan_summary = {
-            "session_id": self.scanner.current_session_id,
+            "session_id": self.scanner.current_session_id or "ON-DEMAND-ASSESSMENT",
             "scan_type": self.scanner.scan_type,
             "files_scanned": self.scanner.files_scanned,
-            "duration_seconds": round(self.scanner.end_time - self.scanner.start_time, 2) if self.scanner.end_time else 0,
             "threats_count": len(self.scanner.threats_found),
             "threats": self.scanner.threats_found,
             "status": "COMPLETED",
@@ -305,14 +411,18 @@ class AntivirusEngine:
         quarantine_items = self.quarantine_mgr.list_quarantine()
         fw_status = self.firewall_monitor.get_firewall_profiles_status()
 
+        vuln_report = self.run_vulnerability_audit()
         report_path = self.sec_logger.generate_security_report(
             scan_summary=scan_summary,
             db_stats=db_stats,
             quarantine_items=quarantine_items,
             firewall_status=fw_status,
+            vulnerability_report=vuln_report,
         )
         self.sec_logger.log_event("INFO", "REPORTS", f"Generated security report: {report_path.name}")
         return report_path
+
+    generate_security_report = generate_current_report
 
     def get_dashboard_summary(self) -> Dict[str, Any]:
         """Returns comprehensive status dictionary for dashboard cards."""
@@ -326,6 +436,10 @@ class AntivirusEngine:
             "status": self.system_status,
             "is_scanning": self.scanner.is_scanning,
             "realtime_active": self.realtime_guard.is_running,
+            "behavioral_active": self.behavioral_monitor.is_running,
+            "ransomware_shield_active": self.ransomware_shield.is_running,
+            "usb_sentinel_active": self.usb_sentinel.is_running,
+            "canaries_deployed": len(self.ransomware_shield.canaries),
             "total_signatures": db_stats.get("total_indicators", 0),
             "definition_version": upd_status.get("version", "Current"),
             "definitions_up_to_date": upd_status.get("status") == "UP_TO_DATE",

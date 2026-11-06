@@ -12,6 +12,7 @@ from typing import Optional
 
 from bi_antivirus.config import APP_NAME, APP_VERSION, ENGINE_VERSION
 from bi_antivirus.core.engine import AntivirusEngine
+from bi_antivirus.core.authenticode import verify_authenticode
 
 
 def print_banner():
@@ -78,6 +79,24 @@ def main():
     # Command: report
     subparsers.add_parser("report", help="Generate security audit report on D: drive")
 
+    # Command: vulnerability
+    subparsers.add_parser("vulnerability", help="Audit Windows system posture and security vulnerabilities")
+
+    # Command: usb
+    usb_parser = subparsers.add_parser("usb", help="Inspect and audit removable USB storage drives")
+    usb_parser.add_argument("--scan", type=str, help="Specific drive letter to audit (e.g., E:)")
+
+    # Command: behavior
+    beh_parser = subparsers.add_parser("behavior", help="Inspect running processes for anomalous or malicious behavior")
+    beh_parser.add_argument("--limit", type=int, default=25, help="Number of processes to inspect")
+
+    # Command: ransomware
+    subparsers.add_parser("ransomware", help="Check ransomware shield status and honeypot canary traps")
+
+    # Command: authenticode
+    auth_parser = subparsers.add_parser("authenticode", help="Verify Authenticode digital signature of a Windows PE binary")
+    auth_parser.add_argument("file", type=str, help="Path to executable or DLL to verify")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -92,6 +111,9 @@ def main():
         summary = engine.get_dashboard_summary()
         print(f"System Status:         {summary['status']}")
         print(f"Real-Time Guard:       {'ACTIVE' if summary['realtime_active'] else 'INACTIVE'}")
+        print(f"Behavioral Sentinel:   {'ACTIVE' if summary.get('behavioral_active') else 'INACTIVE'}")
+        print(f"Ransomware Shield:     {'ACTIVE' if summary.get('ransomware_shield_active') else 'INACTIVE'} ({summary.get('canaries_deployed', 0)} Canaries)")
+        print(f"USB Removable Sentinel:{'ACTIVE' if summary.get('usb_sentinel_active') else 'INACTIVE'}")
         print(f"Malware Signatures:    {summary['total_signatures']}")
         print(f"Definition Version:    {summary['definition_version']}")
         print(f"Definitions Up to Date:{summary['definitions_up_to_date']}")
@@ -204,8 +226,100 @@ def main():
 
     elif args.command == "report":
         print_banner()
-        path = engine.generate_security_report()
+        path = engine.generate_current_report()
         print(f"[+] Security report generated on D: drive: {path}")
+
+    elif args.command == "vulnerability":
+        print_banner()
+        print("[*] Running 5-Control Windows Baseline Security Assessment...")
+        rep = engine.run_vulnerability_audit()
+        print(f"\n[+] 5-CONTROL BASELINE ASSESSMENT: {rep['passed_checks']}/{rep['total_checks']} CONTROLS PASSED ({rep['posture_score']}/100 [{rep['posture_rating']}])")
+        print("    (Evaluates 5 Windows security baseline controls: UAC, SMBv1, Firewall, RDP NLA, Updates)")
+        print(f"    Controls Checked:       {rep['total_checks']}")
+        print(f"    Controls Passed:        {rep['passed_checks']}")
+        print(f"    Vulnerabilities Found:  {rep['vulnerabilities_found']}")
+        print("-" * 75)
+        print(f"{'STATUS':<8} {'CONTROL NAME':<28} {'SEVERITY':<10} {'DETAILS'}")
+        print("-" * 75)
+        for c in rep.get("checks", []):
+            mark = f"[{c.get('status', 'INFO')}]"
+            print(f"{mark:<8} {c.get('check', '')[:26]:<28} {c.get('severity', ''):<10} {c.get('details')}")
+            if c.get("status") != "PASS" and c.get("recommendation"):
+                print(f"         Remediation: {c.get('recommendation')}")
+        print("-" * 75)
+
+    elif args.command == "usb":
+        print_banner()
+        if args.scan:
+            target = args.scan
+            print(f"[*] Auditing Removable Drive Root: {target}...")
+            res = engine.usb_sentinel.audit_drive_root(target)
+            print(f"Drive:          {res.get('drive')}")
+            print(f"Autorun Status: {res.get('autorun_status')}")
+            print(f"Threats Found:  {len(res.get('threats', []))}")
+            for t in res.get("threats", []):
+                print(f"  [!] {t.get('threat_name')} ({t.get('severity')}): {t.get('file_path')}")
+        else:
+            print("[*] Enumerating Mounted Removable USB Storage Drives...")
+            drives = engine.usb_sentinel.get_removable_drives()
+            if not drives:
+                print("[+] No removable USB drives currently mounted.")
+            else:
+                print(f"{'DRIVE':<8} {'TYPE':<12} {'VOLUME NAME':<20} {'FS TYPE'}")
+                print("-" * 55)
+                for d in drives:
+                    print(f"{d['drive']:<8} {'REMOVABLE':<12} {d.get('volume_name', ''):<20} {d.get('fs_type', '')}")
+                print("\n[*] Auditing all mounted removable drives...")
+                for d in drives:
+                    res = engine.usb_sentinel.audit_drive_root(d["drive"])
+                    print(f"  [>] {d['drive']} - Autorun: {res.get('autorun_status')} | Threats: {len(res.get('threats', []))}")
+
+    elif args.command == "behavior":
+        print_banner()
+        print(f"[*] Capturing running process telemetry...")
+        procs = engine.behavioral_monitor.get_process_snapshot()
+        pid_map = {p["pid"]: p["name"] for p in procs}
+        anomalies = []
+        for p in procs:
+            parent_name = pid_map.get(p.get("parent_pid"), "")
+            res = engine.behavioral_monitor.evaluate_process_behavior(p, parent_name=parent_name)
+            if res.get("is_anomaly"):
+                anomalies.append(res)
+
+        print(f"Total Processes Tracked: {len(procs)}")
+        if anomalies:
+            print(f"\n[!] DETECTED BEHAVIORAL ANOMALIES ({len(anomalies)}):")
+            for a in anomalies[:args.limit]:
+                print(f"  PID: {a.get('pid')} | Process: {a.get('process_name')} | Severity: {a.get('severity')}")
+                print(f"  Summary: {a.get('summary')}")
+        else:
+            print("\n[+] No suspicious process anomalies detected. Process tree integrity verified.")
+
+    elif args.command == "ransomware":
+        print_banner()
+        status = engine.ransomware_shield.get_shield_status()
+        print(f"Ransomware Shield:    {'ACTIVE' if status.get('is_running') else 'INACTIVE'}")
+        print(f"Canary Traps Active:  {status.get('canaries_count', 0)}")
+        print(f"Mutations Tracked:    {status.get('mutations_tracked', 0)}")
+        print(f"Burst Alert Count:    {status.get('burst_alerts', 0)}")
+        print("\nDeployed Canary Integrity Traps:")
+        for c in status.get("canaries", []):
+            st = "[DEPLOYED]" if Path(c).exists() else "[MISSING]"
+            print(f"  {st} {c}")
+
+    elif args.command == "authenticode":
+        print_banner()
+        target = Path(args.file)
+        if not target.exists():
+            print(f"[!] File not found: {target}")
+            sys.exit(1)
+        print(f"[*] Auditing Authenticode Digital Signature: {target}...")
+        res = verify_authenticode(target)
+        print(f"Trust Status:    {res.get('status')}")
+        print(f"Is Signed:       {res.get('is_signed')}")
+        print(f"Is Trusted:      {res.get('is_trusted')}")
+        print(f"Status Code:     {hex(res.get('status_code', 0))}")
+        print(f"Description:     {res.get('description', '')}")
 
 
 if __name__ == "__main__":

@@ -177,12 +177,19 @@ class ScanView(tk.Frame):
             self.scan_desc_lbl.config(text=f"Scanning target hotspots ({p.get('scan_type')} Scan)...")
         else:
             self.progress_bar.stop()
-            self.scan_desc_lbl.config(text=f"Scan {p.get('scan_type')} finished. Review any detected threats below.")
+            threats_n = p.get("threats_count", 0)
+            if threats_n > 0:
+                self.scan_desc_lbl.config(text=f"Scan {p.get('scan_type')} completed: {threats_n} threat(s) detected. Review below.")
+            else:
+                self.scan_desc_lbl.config(text=f"Scan {p.get('scan_type')} completed: Clean. Zero threats detected.")
 
         file_disp = p.get("current_file", "")
         if len(file_disp) > 80:
             file_disp = "..." + file_disp[-77:]
-        self.current_file_lbl.config(text=f"Scanning: {file_disp}")
+        if is_scanning:
+            self.current_file_lbl.config(text=f"Scanning: {file_disp}")
+        else:
+            self.current_file_lbl.config(text=f"Status: Scan complete ({p.get('files_scanned', 0)} files evaluated)")
 
         self.metric_scanned.config(text=f"Files Scanned: {p.get('files_scanned', 0):,}")
         threats_count = p.get("threats_count", 0)

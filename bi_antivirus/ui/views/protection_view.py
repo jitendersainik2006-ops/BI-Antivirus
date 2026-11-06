@@ -114,6 +114,39 @@ class ProtectionView(tk.Frame):
         btn_remove = ttk.Button(folder_btns, text="Remove", style="Secondary.TButton", command=self._on_remove_folder)
         btn_remove.pack(side="left")
 
+        # Active Defense Sentinels Telemetry Box
+        sentinels_frame = tk.Frame(left_col, bg=THEME["bg_input"], padx=12, pady=10)
+        sentinels_frame.pack(fill="x", pady=(14, 0))
+        sentinels_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        st_title = tk.Label(
+            sentinels_frame,
+            text="ACTIVE DEFENSE SENTINELS",
+            bg=THEME["bg_input"],
+            fg=THEME["accent_cyan"],
+            font=(THEME["font_family"], 9, "bold"),
+            anchor="w",
+        )
+        st_title.pack(fill="x", pady=(0, 4))
+
+        self.sentinel_rows = {}
+        for s_key, s_name in [
+            ("behavioral", "Behavioral Process Monitor"),
+            ("ransomware", "Ransomware Honeypot Shield"),
+            ("usb", "Removable USB Sentinel"),
+            ("authenticode", "Authenticode WinTrust Verifier"),
+        ]:
+            s_row = tk.Label(
+                sentinels_frame,
+                text=f"● {s_name}: ACTIVE",
+                bg=THEME["bg_input"],
+                fg=THEME["status_safe"],
+                font=(THEME["font_family"], 8),
+                anchor="w",
+            )
+            s_row.pack(fill="x", pady=1)
+            self.sentinel_rows[s_key] = s_row
+
         # 2. Right Panel - Web Protection Tester
         right_col = tk.Frame(content_frame, bg=THEME["bg_panel"], padx=16, pady=16)
         right_col.pack(side="right", fill="both", expand=True, padx=(10, 0))
@@ -210,6 +243,28 @@ class ProtectionView(tk.Frame):
         else:
             self.rt_status_lbl.config(text="Status: INACTIVE (Guard Paused)", fg=THEME["status_warning"])
             self.btn_toggle_rt.config(text="Start Guard")
+
+        if hasattr(self, "sentinel_rows"):
+            b_act = self.engine.behavioral_monitor.is_running
+            self.sentinel_rows["behavioral"].config(
+                text=f"● Behavioral Process Monitor: {'ACTIVE' if b_act else 'STANDBY'}",
+                fg=THEME["status_safe"] if b_act else THEME["text_muted"],
+            )
+            r_act = self.engine.ransomware_shield.is_running
+            c_cnt = len(self.engine.ransomware_shield.canaries)
+            self.sentinel_rows["ransomware"].config(
+                text=f"● Ransomware Honeypot Shield: {'ACTIVE' if r_act else 'STANDBY'} ({c_cnt} Canaries)",
+                fg=THEME["status_safe"] if r_act else THEME["text_muted"],
+            )
+            u_act = self.engine.usb_sentinel.is_running
+            self.sentinel_rows["usb"].config(
+                text=f"● Removable USB Sentinel: {'ACTIVE' if u_act else 'STANDBY'}",
+                fg=THEME["status_safe"] if u_act else THEME["text_muted"],
+            )
+            self.sentinel_rows["authenticode"].config(
+                text="● Authenticode WinTrust Verifier: ACTIVE (Kernel32/WinTrust)",
+                fg=THEME["status_safe"],
+            )
 
     def _on_toggle_realtime(self) -> None:
         if self.engine.realtime_guard.is_running:
