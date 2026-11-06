@@ -456,3 +456,66 @@ class AntivirusEngine:
             "webhook_url": settings.get("webhook_url", "http://127.0.0.1:5678/webhook/bi-threat-alert"),
             "recent_dispatches": self.dispatcher.dispatched_history,
         }
+
+    def quarantine_threat(self, threat_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Coordinates quarantine isolation of a detected threat.
+        Moves file to encrypted vault, updates history, and dispatches security event.
+        """
+        file_path_raw = threat_info.get("file_path")
+        if not file_path_raw:
+            return {"success": False, "error": "No file path specified for quarantine"}
+        file_path = Path(file_path_raw)
+        res = self.quarantine_mgr.quarantine_file(file_path, threat_info)
+        if res.get("success"):
+            self.sec_logger.log_event(
+                "INFO",
+                "QUARANTINE",
+                f"Threat isolated to encrypted vault: {file_path.name} (QID: {res.get('quarantine_id')})",
+                details=res,
+            )
+            # Remove threat from active session scanner list if present
+            self.scanner.threats_found = [
+                t for t in self.scanner.threats_found if t.get("file_path") != str(file_path)
+            ]
+            self._update_system_status()
+        return res
+
+    def restore_threat(
+        self,
+        quarantine_id: str,
+        custom_target: Optional[Path] = None,
+        overwrite: bool = False,
+    ) -> Tuple[bool, str]:
+        """
+        Restores a quarantined threat back to original location or custom target path.
+        """
+        ok, msg = self.quarantine_mgr.restore_file(
+            quarantine_id,
+            custom_target_path=custom_target,
+            overwrite=overwrite,
+        )
+        if ok:
+            self.sec_logger.log_event(
+                "INFO",
+                "QUARANTINE",
+                f"Quarantined file restored: {quarantine_id}",
+                details={"quarantine_id": quarantine_id, "message": msg},
+            )
+            self._update_system_status()
+        return ok, msg
+
+    def purge_threat(self, quarantine_id: str) -> Tuple[bool, str]:
+        """
+        Permanently purges a quarantined file from the vault.
+        """
+        ok, msg = self.quarantine_mgr.purge_file(quarantine_id)
+        if ok:
+            self.sec_logger.log_event(
+                "INFO",
+                "QUARANTINE",
+                f"Quarantined file permanently purged: {quarantine_id}",
+            )
+            self._update_system_status()
+        return ok, msg
+

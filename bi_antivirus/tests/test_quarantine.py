@@ -133,6 +133,39 @@ class TestQuarantineManager(unittest.TestCase):
         self.assertTrue(purge_ok)
         self.assertFalse(vault_file.exists(), "Vault file must be deleted upon purge")
 
+    def test_engine_quarantine_and_restore_coordination(self):
+        """Verify AntivirusEngine coordinates quarantine_threat and restore_threat with QuarantineManager."""
+        from bi_antivirus.core.engine import AntivirusEngine
+        engine = AntivirusEngine()
+        test_file = SCRATCH_DIR / "engine_coord_test.bin"
+        test_file.write_bytes(b"ENGINE_COORDINATION_TEST_PAYLOAD")
+
+        threat_info = {
+            "file_path": str(test_file),
+            "threat_name": "Test.Engine.Threat",
+            "threat_family": "Trojan",
+            "severity": "HIGH",
+        }
+        res = engine.quarantine_threat(threat_info)
+        self.assertTrue(res.get("success"), f"Quarantine failed: {res}")
+        self.assertFalse(test_file.exists())
+        qid = res["quarantine_id"]
+
+        # Test collision protection on restore
+        test_file.write_bytes(b"COLLISION_BLOCKER")
+        ok, msg = engine.restore_threat(qid, overwrite=False)
+        self.assertFalse(ok)
+        self.assertIn("already exists", msg)
+        test_file.unlink()
+
+        # Reversibly restore
+        ok, msg = engine.restore_threat(qid)
+        self.assertTrue(ok, f"Restore failed: {msg}")
+        self.assertTrue(test_file.exists())
+        self.assertEqual(test_file.read_bytes(), b"ENGINE_COORDINATION_TEST_PAYLOAD")
+        test_file.unlink()
+
 
 if __name__ == "__main__":
     unittest.main()
+

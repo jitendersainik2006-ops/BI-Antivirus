@@ -10,7 +10,7 @@
 
 ```
 [00:00 - 01:00]  Minute 1: Introduction, Architecture & Drive D: Containment
-[01:00 - 02:00]  Minute 2: Automated Validation Suite (67/67 Tests Passing)
+[01:00 - 02:00]  Minute 2: Automated Validation Suite (70/70 Tests Passing)
 [02:00 - 03:15]  Minute 3: Authenticated Quarantine Vault (AES-256 + HMAC-SHA256)
 [03:15 - 04:30]  Minute 4: Behavioral Sentinel & Live Process Command-Line Telemetry
 [04:30 - 05:30]  Minute 5: 5-Control Windows Baseline Security Assessment
@@ -42,7 +42,7 @@
   & "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" run_tests.py
   ```
 - **Expected Result:**
-  67 tests run across 13 modules, completing in ~3.2 seconds with **0 failures and 0 errors**.
+  70 tests run across 14 modules, completing in ~3.9 seconds with **0 failures and 0 errors**.
 - **Key Highlight:**
   Point out test coverage across cryptography, Authenticode, Toolhelp32 process tree, ransomware canaries, USB worms, and n8n loopback communication.
 

@@ -517,7 +517,12 @@ class QuarantineManager:
             logger.error(f"Quarantine error for {source_path}: {e}")
             return {"success": False, "error": f"Quarantine error: {e}"}
 
-    def restore_file(self, quarantine_id: str, custom_target_path: Optional[Path] = None) -> Tuple[bool, str]:
+    def restore_file(
+        self,
+        quarantine_id: str,
+        custom_target_path: Optional[Path] = None,
+        overwrite: bool = False,
+    ) -> Tuple[bool, str]:
         """
         Reversibly restore a quarantined file back to original location or custom target path.
         Deciphers quarantined bytes, verifies cryptographic MAC and SHA-256 integrity.
@@ -535,6 +540,8 @@ class QuarantineManager:
             return False, f"Quarantine vault file not found on disk: {vault_file_path}"
 
         target_path = Path(custom_target_path) if custom_target_path else Path(record["original_path"])
+        if not overwrite and target_path.exists():
+            return False, f"Destination file already exists: {target_path}. Restoration aborted to prevent overwriting."
         target_path.parent.mkdir(parents=True, exist_ok=True)
         tmp_target_path = target_path.with_name(f"{target_path.name}.tmp_{uuid.uuid4().hex[:6]}")
 

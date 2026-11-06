@@ -44,7 +44,7 @@
 - [x] Decoupled credential binding referencing encrypted credential ID without plaintext tokens in workflow JSON.
 
 ### 5. Automated Validation & Performance
-- [x] **69 / 69 automated regression tests passing (100% success rate)** in $4.328\text{ seconds}$.
+- [x] **70 / 70 automated regression tests passing (100% success rate)** in $3.895\text{ seconds}$.
 - [x] Rapid service restart resilience tested across 5 consecutive stop/start cycles with zero deadlocks.
 - [x] Transient fault injection resilience verified with graceful exception recovery.
 - [x] Active process memory consumption measured at **$28.12\text{ MB RAM}$** (well below the $60\text{ MB}$ target).

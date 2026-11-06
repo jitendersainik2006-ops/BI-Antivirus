@@ -4,7 +4,7 @@
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-1.1.0--PRO-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-69%2F69%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-70%2F70%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -304,17 +304,17 @@ flowchart LR
 
 ## 11. Automated Test Results
 
-The platform includes a 67-test automated validation suite (`run_tests.py`):
+The platform includes a 70-test automated validation suite (`run_tests.py`):
 
 ```
 ======================================================================
       BI ANTIVIRUS - AUTOMATED VALIDATION TEST SUITE
 ======================================================================
-Ran 67 tests in 3.542s
+Ran 70 tests in 4.120s
 
 OK
 ======================================================================
-Tests Run:      67
+Tests Run:      70
 Failures:       0
 Errors:         0
 Skipped:        0
@@ -333,8 +333,8 @@ Overall Status: SUCCESS (ALL TESTS PASSED)
 | `test_usb_sentinel.py` | 3 | Removable drive mounting detection, malicious autorun.inf execution, LNK shortcut hijacking worms | **PASS** |
 | `test_vulnerability.py` | 3 | UAC `EnableLUA` registry check, legacy SMBv1 EternalBlue vector, 5-control baseline audit computation | **PASS** |
 | `test_detector.py` | 6 | EICAR pattern matching, SHA-256 signatures, false-positive prevention, Shannon entropy, double extensions | **PASS** |
-| `test_scanner.py` | 3 | Traversal performance, folder custom scanning, exclusion filtering, SQLite scan history logging | **PASS** |
-| `test_quarantine.py` | 4 | Authenticated AES-256-CBC + HMAC-SHA256 vault, legacy v1 backward compatibility, tamper detection failsafe, safe purge confirmation | **PASS** |
+| `test_scanner.py` | 4 | Traversal performance, folder custom scanning, scan_custom method alias, exclusion filtering, SQLite scan history logging | **PASS** |
+| `test_quarantine.py` | 5 | Authenticated AES-256-CBC + HMAC-SHA256 vault, AntivirusEngine coordination, legacy v1 backward compatibility, tamper detection failsafe, overwrite protection, safe purge | **PASS** |
 | `test_signatures.py` | 5 | Signature hash indexing, pattern compilation, web reputation lookups, JSON import/export | **PASS** |
 | `test_error_handling.py` | 4 | Inaccessible files, corrupted signature packs, nonexistent quarantine IDs, malformed URLs | **PASS** |
 | `test_integrations.py` | 14 | API key constant-time validation, rate limiting, REST endpoints, voice alerts, template schema validation | **PASS** |

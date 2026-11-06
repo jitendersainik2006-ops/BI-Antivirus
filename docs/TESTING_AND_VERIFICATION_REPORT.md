@@ -2,7 +2,7 @@
 
 **Verification Date:** November 6, 2026  
 **Platform Version:** `1.1.0-PRO` | **Engine Version:** `2026.11-RELEASE`  
-**Test Suite Execution Status:** **69 / 69 Tests Passing (100% SUCCESS)**  
+**Test Suite Execution Status:** **70 / 70 Tests Passing (100% SUCCESS)**  
 **Total Runtime:** `4.328 seconds`  
 
 ---
@@ -12,7 +12,7 @@
 | Suite Name | Module Tested | Test Count | Status | Description |
 | :--- | :--- | :---: | :---: | :--- |
 | `test_crypto_deep.py` | `core/quarantine.py` | 7 | **PASS** | AES-256-CBC, HMAC-SHA256 EtM, DPAPI master key unwrap, IV entropy, single-bit tamper rejection, atomic file replace. |
-| `test_quarantine.py` | `core/quarantine.py` | 4 | **PASS** | Full quarantine cycle, reversible bit-perfect restore, legacy XOR v1 compatibility, HMAC tamper rejection. |
+| `test_quarantine.py` | `core/quarantine.py` | 5 | **PASS** | Full quarantine cycle, AntivirusEngine coordinator integration, reversible bit-perfect restore, legacy XOR v1 compatibility, HMAC tamper rejection, collision overwrite protection. |
 | `test_detector.py` | `core/detector.py` | 7 | **PASS** | Exact SHA-256 matching, in-memory EICAR recognition, clean file false-positive prevention, zero-byte false-positive prevention, ransomware heuristics, double-extension, Shannon entropy. |
 | `test_scanner.py` | `core/scanner.py` | 4 | **PASS** | Custom directory scan (`scan_path` & `scan_custom`), exclusion path/extension filtering, scan history persistence. |
 | `test_signatures.py` | `database/signatures.py` | 5 | **PASS** | Hash lookup, byte/regex pattern matching, JSON signature export/import, ransomware heuristics, web reputation. |
@@ -24,7 +24,7 @@
 | `test_integrations.py` | `api/server.py`, `alerts/` | 12 | **PASS** | REST API authentication, rate limiting, quick scan trigger, status telemetry, n8n templates validity, voice alerting. |
 | `test_n8n_connectivity.py`| `api/n8n_daemon.py` | 8 | **PASS** | Loopback binding enforcement, non-localhost rejection (403), webhook threat ingestion, simulated workflows 01 and 05. |
 | `test_error_handling.py` | Error paths | 4 | **PASS** | Corrupted signature update packs, invalid URLs, nonexistent files, nonexistent quarantine IDs. |
-| **Total** | | **69** | **100% PASS** | **Zero Failures, Zero Errors, Zero Skipped** |
+| **Total** | | **70** | **100% PASS** | **Zero Failures, Zero Errors, Zero Skipped** |
 
 ---
 

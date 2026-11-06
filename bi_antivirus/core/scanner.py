@@ -217,6 +217,7 @@ class FileScanner:
 
         # Discover all target files
         for target in targets:
+            target = Path(target)
             if not target.exists():
                 continue
             if target.is_file():
