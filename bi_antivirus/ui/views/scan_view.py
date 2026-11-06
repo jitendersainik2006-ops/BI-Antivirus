@@ -219,6 +219,29 @@ class ScanView(tk.Frame):
                     ),
                 )
 
+    def refresh_data(self) -> None:
+        """Refresh detected threats from engine scanner session if present."""
+        current_threats = getattr(self.engine.scanner, "threats_found", [])
+        existing_items = self.tree.get_children()
+        if len(existing_items) != len(current_threats):
+            self.tree.delete(*existing_items)
+            for t in current_threats:
+                self.tree.insert(
+                    "",
+                    "end",
+                    values=(
+                        t.get("severity", "HIGH"),
+                        t.get("threat_name", "Unknown"),
+                        t.get("threat_family", "Generic"),
+                        f"{t.get('risk_score', 0)}%",
+                        t.get("file_path", ""),
+                    ),
+                )
+        if current_threats:
+            self.metric_threats.config(text=f"Threats Found: {len(current_threats)}", fg=THEME["status_threat"])
+        else:
+            self.metric_threats.config(text="Threats Found: 0", fg=THEME["status_safe"])
+
     def _on_cancel(self) -> None:
         self.engine.cancel_scan()
         self.scan_desc_lbl.config(text="Scan cancellation requested.")

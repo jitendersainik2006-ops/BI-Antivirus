@@ -28,7 +28,7 @@ The primary architectural mandate is **strict non-destructive security and local
 
 | Subsystem | Capabilities & Mechanisms | Verification State |
 | :--- | :--- | :---: |
-| **Multi-Layer Detection Engine** | Streaming SHA-256/MD5 hashing in 64 KB memory-safe blocks; SQLite signature catalog with $O(1)$ indexed lookup; in-memory EICAR standard recognition; zero-byte false-positive suppression. | **VERIFIED (68/68 Tests Pass)** |
+| **Multi-Layer Detection Engine** | Streaming SHA-256/MD5 hashing in 64 KB memory-safe blocks; SQLite signature catalog with $O(1)$ indexed lookup; in-memory EICAR standard recognition; zero-byte false-positive suppression. | **VERIFIED (70/70 Tests Pass)** |
 | **Heuristic & Anti-Evasion Analysis** | Shannon byte entropy analysis ($H > 7.2$ flags packed executables); double extension interceptor (e.g., `doc.pdf.exe`); PE packer section analysis (`.upx0`, `.aspack`, `.themida`); process injection import detection. | **VERIFIED (Tests Pass)** |
 | **Native Authenticode Verifier** | Native Windows `wintrust.dll` integration (`WinVerifyTrust` / `WINTRUST_ACTION_GENERIC_VERIFY_V2`) via `ctypes` validating digital signatures without third-party dependencies. | **VERIFIED (Native WinTrust API)** |
 | **Behavioral Process Sentinel** | Native `CreateToolhelp32Snapshot` combined with `NtQueryInformationProcess(60)` for live command-line visibility; flags anomalous parent-child chains (Word -> Shell), LOLBin exploitation, and ransomware staging. | **VERIFIED (Live CLI Extraction)** |
