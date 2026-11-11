@@ -180,11 +180,28 @@ class IncidentGraphEngine:
         "installutil.exe", "regasm.exe", "regsvcs.exe",
     }
 
-    def __init__(self, history_db: Optional[Any] = None):
+    def __init__(self, history_db: Optional[Any] = None, max_memory_incidents: int = 500):
         self.history_db = history_db
+        self.max_memory_incidents = max_memory_incidents
         self.incidents: Dict[str, EDRIncident] = {}
         # Entity-to-incident index for fast correlation: {entity_key: incident_id}
         self._entity_index: Dict[str, str] = {}
+
+    def _prune_memory_cache(self) -> None:
+        """Prune oldest non-active incidents from memory to enforce bounded memory usage."""
+        non_active_ids = [iid for iid, inc in self.incidents.items() if inc.status != "ACTIVE"]
+        if len(non_active_ids) < 50:
+            sorted_all = sorted(self.incidents.items(), key=lambda item: item[1].created_at)
+            to_remove = [iid for iid, _ in sorted_all[:50]]
+        else:
+            to_remove = non_active_ids[:50]
+
+        for iid in to_remove:
+            self.incidents.pop(iid, None)
+
+        stale_keys = [k for k, iid in self._entity_index.items() if iid in to_remove]
+        for k in stale_keys:
+            self._entity_index.pop(k, None)
 
     def _generate_incident_id(self) -> str:
         date_str = time.strftime("%Y%m%d")
@@ -196,6 +213,9 @@ class IncidentGraphEngine:
         Ingest a security event from any protection subsystem and correlate it into the graph.
         Returns the incident_id associated with this event.
         """
+        if len(self.incidents) >= self.max_memory_incidents:
+            self._prune_memory_cache()
+
         # Determine or correlate incident
         incident = self._correlate_incident(event_type, data)
 

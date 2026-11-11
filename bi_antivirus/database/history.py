@@ -6,9 +6,12 @@ using SQLite database located on D: drive.
 
 import sqlite3
 import json
-from typing import Optional, List, Dict, Any
+import logging
+from typing import Optional, List, Dict, Any, Tuple
 from pathlib import Path
 from bi_antivirus.config import HISTORY_DB_PATH
+
+logger = logging.getLogger("bi_antivirus.history")
 
 class HistoryDatabase:
     """Stores scan session history and persistent threat event records."""
@@ -21,6 +24,12 @@ class HistoryDatabase:
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=15.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA busy_timeout=5000;")
+        except Exception:
+            pass
         return conn
 
     def _init_db(self) -> None:
@@ -157,7 +166,45 @@ class HistoryDatabase:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            # High-throughput performance indexes
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_session ON threat_detections (session_id);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_hash ON threat_detections (file_hash);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_severity ON threat_detections (severity);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_threats_detected ON threat_detections (detected_at);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_started ON scan_sessions (started_at);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_timestamp ON security_events (timestamp);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON security_events (event_type);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_edr_severity ON edr_incidents (severity);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_edr_created ON edr_incidents (created_at);")
+
             conn.commit()
+
+    def check_integrity(self) -> Tuple[bool, str]:
+        """Perform SQLite PRAGMA integrity_check to verify database health."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("PRAGMA integrity_check;")
+                res = cursor.fetchone()
+                if res and res[0] == "ok":
+                    return True, "Database integrity verified (PRAGMA integrity_check: ok)"
+                return False, f"Database integrity check warning: {res[0] if res else 'Unknown'}"
+        except Exception as e:
+            return False, f"Database integrity check failed: {e}"
+
+    def create_backup(self, backup_path: Path) -> bool:
+        """Perform a safe physical SQLite online backup using SQLite backup API."""
+        try:
+            backup_path = Path(backup_path)
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._get_connection() as src:
+                with sqlite3.connect(str(backup_path)) as dst:
+                    src.backup(dst)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create database backup to {backup_path}: {e}")
+            return False
 
     def record_scan_session(
         self,

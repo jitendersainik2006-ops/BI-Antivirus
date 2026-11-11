@@ -25,15 +25,38 @@ logger = logging.getLogger("bi_antivirus.logger")
 class SecurityLogger:
     """Handles structured event logging to bi_security.log and generates Markdown reports."""
 
-    def __init__(self, log_path: Optional[Path] = None):
+    def __init__(self, log_path: Optional[Path] = None, max_bytes: int = 10 * 1024 * 1024, backup_count: int = 3):
         self.log_path = Path(log_path or EVENT_LOG_PATH)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
+        self.max_bytes = max_bytes
+        self.backup_count = backup_count
+
+    def _rotate_if_needed(self) -> None:
+        """Rotate log file if it exceeds max_bytes to bound disk usage."""
+        if not self.log_path.exists():
+            return
+        try:
+            if self.log_path.stat().st_size >= self.max_bytes:
+                for i in range(self.backup_count - 1, 0, -1):
+                    sfn = self.log_path.with_name(f"{self.log_path.name}.{i}")
+                    dfn = self.log_path.with_name(f"{self.log_path.name}.{i + 1}")
+                    if sfn.exists():
+                        if dfn.exists():
+                            dfn.unlink()
+                        sfn.rename(dfn)
+                dfn = self.log_path.with_name(f"{self.log_path.name}.1")
+                if dfn.exists():
+                    dfn.unlink()
+                self.log_path.rename(dfn)
+        except Exception as e:
+            logger.debug(f"Log rotation exception: {e}")
 
     def log_event(self, level: str, source: str, message: str, details: Optional[Dict[str, Any]] = None) -> None:
         """
         Record a structured security event entry to the audit log.
         Format: [TIMESTAMP] [LEVEL] [SOURCE] Message | JSON_DETAILS
         """
+        self._rotate_if_needed()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         entry = f"[{timestamp}] [{level.upper()}] [{source.upper()}] {message}"
         if details:

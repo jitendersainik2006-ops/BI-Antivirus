@@ -357,32 +357,45 @@ class MTLSClient:
         action: str,
         payload: Dict[str, Any],
         timeout: float = 5.0,
+        max_retries: int = 3,
+        backoff_sec: float = 0.3,
     ) -> Dict[str, Any]:
-        """Establish mTLS connection, send JSON request envelope, and return server response."""
-        req_envelope = {
-            "msg_id": str(uuid.uuid4()),
-            "endpoint_id": self.endpoint_id,
-            "timestamp": time.time(),
-            "nonce": str(uuid.uuid4()),
-            "action": action,
-            "payload": payload,
-        }
+        """
+        Establish mTLS connection, send JSON request envelope, and return server response.
+        Includes automatic retry with exponential backoff for transient connection errors.
+        """
+        last_error = ""
+        for attempt in range(max_retries):
+            req_envelope = {
+                "msg_id": str(uuid.uuid4()),
+                "endpoint_id": self.endpoint_id,
+                "timestamp": time.time(),
+                "nonce": str(uuid.uuid4()),
+                "action": action,
+                "payload": payload,
+            }
 
-        raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        raw_sock.settimeout(timeout)
-        try:
-            raw_sock.connect((self.server_host, self.server_port))
-            with self.ssl_context.wrap_socket(raw_sock, server_hostname="localhost") as tls_sock:
-                tls_sock.sendall(json.dumps(req_envelope).encode("utf-8"))
-                response_data = tls_sock.recv(65536)
-                if not response_data:
-                    return {"status": "ERROR", "error": "Empty response from server"}
-                return json.loads(response_data.decode("utf-8"))
-        except Exception as e:
-            logger.error(f"mTLS request failed for {self.endpoint_id}: {e}")
-            return {"status": "ERROR", "error": str(e)}
-        finally:
+            raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            raw_sock.settimeout(timeout)
             try:
-                raw_sock.close()
-            except Exception:
-                pass
+                raw_sock.connect((self.server_host, self.server_port))
+                with self.ssl_context.wrap_socket(raw_sock, server_hostname="localhost") as tls_sock:
+                    tls_sock.sendall(json.dumps(req_envelope).encode("utf-8"))
+                    response_data = tls_sock.recv(65536)
+                    if not response_data:
+                        return {"status": "ERROR", "error": "Empty response from server"}
+                    return json.loads(response_data.decode("utf-8"))
+            except Exception as e:
+                last_error = str(e)
+                logger.debug(f"mTLS request attempt {attempt + 1}/{max_retries} failed for {self.endpoint_id}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(backoff_sec * (2 ** attempt))
+            finally:
+                try:
+                    raw_sock.close()
+                except Exception:
+                    pass
+
+        logger.error(f"mTLS request failed after {max_retries} attempts for {self.endpoint_id}: {last_error}")
+        return {"status": "ERROR", "error": last_error}
+

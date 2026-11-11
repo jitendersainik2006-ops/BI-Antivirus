@@ -9,7 +9,8 @@ import sqlite3
 import re
 import json
 import logging
-from typing import Optional, List, Dict, Any
+import threading
+from typing import Optional, List, Dict, Any, Tuple
 from pathlib import Path
 from bi_antivirus.config import (
     SIGNATURES_DB_PATH,
@@ -38,12 +39,20 @@ class SignatureDatabase:
     def __init__(self, db_path: Optional[Path] = None):
         self.db_path = Path(db_path or SIGNATURES_DB_PATH)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._compiled_patterns_cache: Optional[List[Tuple[str, str, Any, str, str]]] = None
+        self._cache_lock = threading.Lock()
         self._init_db()
         self._ensure_seeds()
 
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=15.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA busy_timeout=5000;")
+        except Exception:
+            pass
         return conn
 
     def _init_db(self) -> None:
@@ -94,6 +103,10 @@ class SignatureDatabase:
                     value TEXT NOT NULL
                 )
             """)
+
+            # High-throughput performance indexes
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_pattern_active ON pattern_signatures (is_active);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_web_rep_domain ON web_reputation (domain_or_url);")
 
             cursor.execute("""
                 INSERT OR REPLACE INTO db_metadata (key, value)
@@ -253,8 +266,39 @@ class SignatureDatabase:
                 return dict(row)
         return None
 
+    def invalidate_pattern_cache(self) -> None:
+        """Invalidate in-memory compiled pattern cache."""
+        with self._cache_lock:
+            self._compiled_patterns_cache = None
+
+    def _load_compiled_patterns(self) -> List[Tuple[str, str, Any, str, str]]:
+        """Pre-compile active regex patterns into memory once for high-throughput scanning."""
+        with self._cache_lock:
+            if self._compiled_patterns_cache is not None:
+                return self._compiled_patterns_cache
+
+            compiled = []
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT rule_name, threat_family, pattern_regex, severity, description
+                    FROM pattern_signatures
+                    WHERE is_active = 1
+                """)
+                for row in cursor.fetchall():
+                    rule_name = row["rule_name"]
+                    pattern = row["pattern_regex"]
+                    try:
+                        compiled_re = re.compile(pattern)
+                        compiled.append((rule_name, row["threat_family"], compiled_re, row["severity"], row["description"]))
+                    except Exception as e:
+                        logger.debug(f"Failed to pre-compile pattern for {rule_name}: {e}")
+
+            self._compiled_patterns_cache = compiled
+            return self._compiled_patterns_cache
+
     def match_patterns(self, file_content: bytes, max_bytes: int = 1048576) -> List[Dict[str, Any]]:
-        """Scan file bytes (up to max_bytes) against active regex and byte rules."""
+        """Scan file bytes (up to max_bytes) against active regex and byte rules using cached compiled patterns."""
         sample = file_content[:max_bytes]
         matched = []
 
@@ -263,27 +307,19 @@ class SignatureDatabase:
         except Exception:
             sample_text = ""
 
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT rule_name, threat_family, pattern_regex, severity, description
-                FROM pattern_signatures
-                WHERE is_active = 1
-            """)
-            for row in cursor.fetchall():
-                rule_name = row["rule_name"]
-                pattern = row["pattern_regex"]
-                try:
-                    if re.search(pattern, sample_text):
-                        matched.append({
-                            "rule_name": rule_name,
-                            "threat_name": f"{row['threat_family']}.Heuristic.{rule_name}",
-                            "threat_family": row["threat_family"],
-                            "severity": row["severity"],
-                            "description": row["description"],
-                        })
-                except Exception as e:
-                    logger.debug(f"Pattern regex evaluation failed for {rule_name}: {e}")
+        patterns = self._load_compiled_patterns()
+        for rule_name, threat_family, pattern_re, severity, description in patterns:
+            try:
+                if pattern_re.search(sample_text):
+                    matched.append({
+                        "rule_name": rule_name,
+                        "threat_name": f"{threat_family}.Heuristic.{rule_name}",
+                        "threat_family": threat_family,
+                        "severity": severity,
+                        "description": description,
+                    })
+            except Exception as e:
+                logger.debug(f"Pattern regex evaluation failed for {rule_name}: {e}")
 
         return matched
 
@@ -403,4 +439,5 @@ class SignatureDatabase:
                 cursor.execute("INSERT OR REPLACE INTO db_metadata (key, value) VALUES ('version', ?)", (data["version"],))
 
             conn.commit()
+        self.invalidate_pattern_cache()
         return imported_count

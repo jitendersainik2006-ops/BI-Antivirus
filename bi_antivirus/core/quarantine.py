@@ -402,6 +402,12 @@ class QuarantineManager:
     def _get_connection(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=15.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA busy_timeout=5000;")
+        except Exception:
+            pass
         return conn
 
     def _init_db(self) -> None:
@@ -430,6 +436,12 @@ class QuarantineManager:
             cols = [col[1] for col in cursor.fetchall()]
             if "vault_format" not in cols:
                 cursor.execute("ALTER TABLE quarantine_records ADD COLUMN vault_format TEXT DEFAULT 'XOR_V1'")
+
+            # High-throughput performance indexes
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_quarantine_hash ON quarantine_records (file_hash);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_quarantine_status ON quarantine_records (status);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_quarantine_time ON quarantine_records (quarantined_at);")
+
             conn.commit()
 
     def quarantine_file(self, file_path: Path, threat_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -708,3 +720,44 @@ class QuarantineManager:
             "already_v2_or_skipped": skipped_count,
             "errors": errors,
         }
+
+    def verify_vault_integrity(self) -> Dict[str, Any]:
+        """
+        Audit all active quarantine vault records against disk files to verify vault integrity.
+        Returns detailed summary of intact, missing, and corrupted vault records.
+        """
+        records = self.list_quarantine(status="QUARANTINED")
+        intact_count = 0
+        missing_count = 0
+        corrupt_count = 0
+        issues = []
+
+        for r in records:
+            qid = r["quarantine_id"]
+            vault_path = Path(r["vault_path"])
+            if not vault_path.exists():
+                missing_count += 1
+                issues.append(f"{qid}: Vault file missing on disk ({vault_path})")
+                continue
+
+            try:
+                with open(vault_path, "rb") as f:
+                    header = f.read(VAULT_HEADER_MIN_SIZE)
+                if len(header) < 4:
+                    corrupt_count += 1
+                    issues.append(f"{qid}: Vault file too small or empty")
+                else:
+                    intact_count += 1
+            except Exception as e:
+                corrupt_count += 1
+                issues.append(f"{qid}: Read error ({e})")
+
+        return {
+            "total_records": len(records),
+            "intact_records": intact_count,
+            "missing_records": missing_count,
+            "corrupt_records": corrupt_count,
+            "issues": issues,
+            "all_healthy": (missing_count == 0 and corrupt_count == 0),
+        }
+
