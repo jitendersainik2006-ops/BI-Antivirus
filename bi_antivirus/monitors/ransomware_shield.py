@@ -215,17 +215,26 @@ class RansomwareShield:
         # Also check for single-sample high entropy on standard non-compressed extensions
         name_lower = file_path.name.lower()
         if any(name_lower.endswith(sfx) for sfx in (".txt", ".log", ".csv", ".json", ".xml", ".sql")) and entropy >= 7.6:
-            alert = {
-                "type": "RANSOMWARE_HIGH_ENTROPY_TEXT",
-                "file_path": str(file_path),
-                "severity": SEVERITY_HIGH,
-                "threat_name": "Ransomware.SuspiciousHighEntropyDocument",
-                "summary": f"Abnormally high entropy ({entropy:.2f} bits/byte) in document {file_path.name}",
-                "current_entropy": entropy,
-                "recovery_guidance": RECOVERY_GUIDANCE,
-            }
-            self._handle_alert(alert)
-            return alert
+            # False positive mitigation:
+            # Legitimate high-entropy text (e.g. dense base64, minified JSON, UUID tokens)
+            # consists of printable ASCII (0x20-0x7E, \t, \n, \r).
+            # True encrypted ransomware ciphertext is uniformly distributed across all 256 bytes,
+            # exhibiting high density of non-printable binary control bytes (> 25%).
+            non_printable = sum(1 for b in data if not (0x20 <= b <= 0x7E or b in (9, 10, 13)))
+            non_printable_ratio = non_printable / len(data)
+            if non_printable_ratio > 0.25:
+                alert = {
+                    "type": "RANSOMWARE_HIGH_ENTROPY_TEXT",
+                    "file_path": str(file_path),
+                    "severity": SEVERITY_HIGH,
+                    "threat_name": "Ransomware.SuspiciousHighEntropyDocument",
+                    "summary": f"Abnormally high entropy ({entropy:.2f} bits/byte, binary density {non_printable_ratio:.1%}) in document {file_path.name}",
+                    "current_entropy": entropy,
+                    "non_printable_ratio": round(non_printable_ratio, 4),
+                    "recovery_guidance": RECOVERY_GUIDANCE,
+                }
+                self._handle_alert(alert)
+                return alert
 
         return None
 

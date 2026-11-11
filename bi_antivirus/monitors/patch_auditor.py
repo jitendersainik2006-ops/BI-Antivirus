@@ -41,6 +41,8 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "7-Zip Out-of-Bounds Memory Write in SquashFS",
         "description": "An integer underflow leading to out-of-bounds write vulnerability allows arbitrary code execution via crafted SquashFS archive files.",
         "remediation": "Update 7-Zip to version 23.01 or newer via the official vendor website (https://www.7-zip.org).",
+        "published_date": "2023-05-09",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2023-31102",
     },
     {
         "cve_id": "CVE-2023-38831",
@@ -54,6 +56,8 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "WinRAR Spoofed File Extension Execution Vulnerability",
         "description": "A crafted ZIP or RAR archive with spaces in file names causes execution of disguised executable payloads when opening harmless document files.",
         "remediation": "Immediately upgrade WinRAR to version 6.23 or newer. Do not open untrusted archive attachments.",
+        "published_date": "2023-08-23",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2023-38831",
     },
     {
         "cve_id": "CVE-2024-7971",
@@ -67,6 +71,8 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "V8 Type Confusion Vulnerability in Google Chrome",
         "description": "Type confusion in the V8 JavaScript engine allows a remote attacker to execute arbitrary code via a crafted HTML page.",
         "remediation": "Update Google Chrome to version 128.0.6613.84 or newer via Settings -> About Google Chrome.",
+        "published_date": "2024-08-21",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2024-7971",
     },
     {
         "cve_id": "CVE-2024-32002",
@@ -80,6 +86,8 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "Git Submodule Case-Sensitivity Remote Code Execution",
         "description": "Recursive submodule clones on case-insensitive filesystems (Windows NTFS) can trick Git into executing untrusted post-checkout hooks.",
         "remediation": "Upgrade Git for Windows to version 2.45.1 or newer (https://git-scm.com/download/win).",
+        "published_date": "2024-05-14",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2024-32002",
     },
     {
         "cve_id": "CVE-2023-40031",
@@ -93,6 +101,8 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "Notepad++ Buffer Overflow in Utf8_16 Class",
         "description": "Heap-based buffer overflow in Utf8_16::utf8_16 allows potential code execution during file encoding conversions.",
         "remediation": "Upgrade Notepad++ to version 8.5.7 or higher via the official portal.",
+        "published_date": "2023-08-30",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2023-40031",
     },
     {
         "cve_id": "CVE-2024-45421",
@@ -106,6 +116,8 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "Zoom Improper Input Validation Privilege Escalation",
         "description": "Improper input validation in Zoom desktop client allows an authenticated user to perform local privilege escalation.",
         "remediation": "Upgrade Zoom Workplace client to version 6.2.0 or newer.",
+        "published_date": "2024-09-10",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2024-45421",
     },
     {
         "cve_id": "CVE-2023-47359",
@@ -119,6 +131,8 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "VLC Media Player Denial of Service & Code Execution",
         "description": "A crafted multimedia container triggers a null-pointer dereference or buffer overflow in demuxer modules.",
         "remediation": "Update VLC Media Player to version 3.0.20 or newer.",
+        "published_date": "2023-11-08",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2023-47359",
     },
     {
         "cve_id": "CVE-2024-0450",
@@ -132,19 +146,29 @@ DEFAULT_CVE_ADVISORIES: List[Dict[str, Any]] = [
         "title": "Zipfile Path Traversal Vulnerability (Quoted Slashes)",
         "description": "An issue in zipfile module allows extracting files to unintended paths if archive entries contain specially crafted slashes.",
         "remediation": "Update Python to version 3.12.3 or newer.",
+        "published_date": "2024-03-19",
+        "source_reference": "https://nvd.nist.gov/vuln/detail/CVE-2024-0450",
     },
 ]
 
 
-def parse_version_tuple(version_str: str) -> Tuple[int, ...]:
-    """Parse a semantic version string into a comparable tuple of integers."""
+def parse_version_tuple(version_str: str, min_length: int = 4) -> Tuple[int, ...]:
+    """
+    Parse a semantic version string into a comparable tuple of integers.
+    Normalizes with trailing zeros to at least min_length elements (default 4: major, minor, patch, build)
+    to prevent Python tuple comparison length-mismatch anomalies (e.g. (1, 0) < (1, 0, 0) being True).
+    """
     if not version_str:
-        return (0,)
+        return (0,) * min_length
     # Remove leading 'v', 'ver', etc.
     cleaned = re.sub(r"(?i)^[a-z\s]+", "", version_str.strip())
     # Extract only digit components
     tokens = [int(p) for p in re.findall(r"\d+", cleaned)]
-    return tuple(tokens) if tokens else (0,)
+    if not tokens:
+        return (0,) * min_length
+    if len(tokens) < min_length:
+        tokens = tokens + [0] * (min_length - len(tokens))
+    return tuple(tokens)
 
 
 def is_version_vulnerable(installed: str, min_ver: str, fixed_ver: str) -> Tuple[bool, bool]:
@@ -155,6 +179,15 @@ def is_version_vulnerable(installed: str, min_ver: str, fixed_ver: str) -> Tuple
     inst_tuple = parse_version_tuple(installed)
     min_tuple = parse_version_tuple(min_ver)
     fixed_tuple = parse_version_tuple(fixed_ver)
+
+    # Normalize all tuples to equal length
+    max_len = max(len(inst_tuple), len(min_tuple), len(fixed_tuple), 4)
+    if len(inst_tuple) < max_len:
+        inst_tuple = inst_tuple + (0,) * (max_len - len(inst_tuple))
+    if len(min_tuple) < max_len:
+        min_tuple = min_tuple + (0,) * (max_len - len(min_tuple))
+    if len(fixed_tuple) < max_len:
+        fixed_tuple = fixed_tuple + (0,) * (max_len - len(fixed_tuple))
 
     if inst_tuple >= fixed_tuple:
         return False, True  # Up to date

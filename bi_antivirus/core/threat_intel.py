@@ -60,6 +60,10 @@ class ThreatIntelEngine:
     def current_sequence(self) -> int:
         return self._current_sequence
 
+    def rotate_signing_key(self) -> Tuple[bytes, bytes]:
+        """Rotate the signing key and preserve previous key for backward compatibility."""
+        return self.key_manager.rotate_signing_key()
+
     def generate_update_bundle(
         self,
         version: str,
@@ -136,7 +140,18 @@ class ThreatIntelEngine:
             hashlib.sha256,
         ).hexdigest()
 
-        if not hmac.compare_digest(sig_hmac, expected_sig):
+        sig_valid = hmac.compare_digest(sig_hmac, expected_sig)
+        if not sig_valid:
+            prev_key = self.key_manager.get_previous_signing_key()
+            if prev_key:
+                prev_sig = hmac.new(
+                    prev_key,
+                    manifest_canonical.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+                sig_valid = hmac.compare_digest(sig_hmac, prev_sig)
+
+        if not sig_valid:
             msg = "Cryptographic integrity failure: HMAC signature mismatch. Bundle may be corrupted or tampered."
             logger.error(msg)
             return False, msg

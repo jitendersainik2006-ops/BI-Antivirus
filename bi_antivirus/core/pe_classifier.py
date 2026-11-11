@@ -121,6 +121,10 @@ class PEClassifier:
     def __init__(self, history_db: Optional[Any] = None):
         self.history_db = history_db
 
+    def inspect_pe_file(self, file_path: Path) -> Dict[str, Any]:
+        """Alias for analyze_file."""
+        return self.analyze_file(file_path)
+
     def analyze_file(self, file_path: Path) -> Dict[str, Any]:
         """
         Analyze a local file statically.
@@ -179,6 +183,18 @@ class PEClassifier:
             base_result["error"] = "File does not exist or is not a regular file."
             return base_result
 
+        # Protect against unbounded memory consumption on oversized files (> 150MB)
+        try:
+            st_size = path_obj.stat().st_size
+            if st_size > 150 * 1024 * 1024:
+                base_result["error"] = f"File exceeds maximum analysis size (150MB): {st_size} bytes."
+                base_result["verdict"] = "SKIPPED_OVERSIZED"
+                base_result["classification"] = "SKIPPED_OVERSIZED"
+                return base_result
+        except Exception as e:
+            base_result["error"] = f"Failed inspecting file size: {e}"
+            return base_result
+
         try:
             raw_bytes = path_obj.read_bytes()
             base_result["file_size"] = len(raw_bytes)
@@ -216,6 +232,8 @@ class PEClassifier:
             machine, num_sections, timedate, _, _, size_opt_hdr, characteristics = struct.unpack_from(
                 "<HHIIIHH", raw_bytes, coff_offset
             )
+            # Hard limit: Windows PE loader supports at most 96 sections
+            num_sections = min(num_sections, 96)
             base_result["compile_time"] = timedate
             base_result["sections_count"] = num_sections
 
@@ -331,7 +349,9 @@ class PEClassifier:
                     if v_start <= rva < v_start + v_span:
                         delta = rva - v_start
                         if delta < s["raw_size"]:
-                            return s["raw_pointer"] + delta
+                            off = s["raw_pointer"] + delta
+                            if 0 <= off < len(raw_bytes):
+                                return off
                 return None
 
             # 6. Parse Imports

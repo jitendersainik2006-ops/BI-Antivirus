@@ -32,6 +32,7 @@ from bi_antivirus.ui.views.reports_view import ReportsView
 from bi_antivirus.ui.views.edr_view import EDRView
 from bi_antivirus.ui.views.patch_view import PatchView
 from bi_antivirus.ui.views.pe_view import PEClassifierView
+from bi_antivirus.ui.views.fleet_view import FleetView
 
 
 class AntivirusDashboard(tk.Tk):
@@ -117,6 +118,7 @@ class AntivirusDashboard(tk.Tk):
             ("edr", "🧠  EDR & Exploit Shield"),
             ("patch", "📦  Software & Patching"),
             ("pe_inspect", "🔬  PE Static Inspector"),
+            ("fleet", "🏢  Enterprise Fleet"),
         ]
 
         for key, label in nav_items:
@@ -178,6 +180,7 @@ class AntivirusDashboard(tk.Tk):
             "edr": EDRView(self.content_area, engine=self.engine),
             "patch": PatchView(self.content_area, engine=self.engine),
             "pe_inspect": PEClassifierView(self.content_area, engine=self.engine),
+            "fleet": FleetView(self.content_area, engine=self.engine),
         }
 
     def _setup_engine_callbacks(self) -> None:

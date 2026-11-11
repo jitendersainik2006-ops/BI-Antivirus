@@ -48,6 +48,8 @@ from bi_antivirus.core.incident_graph import IncidentGraphEngine
 from bi_antivirus.core.pe_classifier import PEClassifier
 from bi_antivirus.monitors.patch_auditor import SoftwarePatchAuditor
 from bi_antivirus.core.threat_intel import ThreatIntelEngine
+from bi_antivirus.enterprise.fleet_manager import FleetManager
+from bi_antivirus.enterprise.compliance_reporter import ComplianceReporter
 
 
 class AntivirusEngine:
@@ -156,6 +158,10 @@ class AntivirusEngine:
 
         # 24. Threat Intelligence Update Engine
         self.threat_intel = ThreatIntelEngine(history_db=self.history_db, sig_db=self.sig_db)
+
+        # 25. Enterprise Fleet Management & Compliance Reporting
+        self.fleet_manager = FleetManager()
+        self.compliance_reporter = ComplianceReporter(fleet_manager=self.fleet_manager, history_db=self.history_db)
 
         # Live Status
         self.system_status = "PROTECTED"

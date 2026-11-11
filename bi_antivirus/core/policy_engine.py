@@ -53,7 +53,7 @@ class PolicyKeyManager:
     def __init__(self, key_path: Optional[Path] = None):
         self.key_path = Path(key_path or POLICY_KEY_PATH)
         self._cached_key: Optional[bytes] = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def get_signing_key(self) -> bytes:
         """Retrieve or generate 256-bit DPAPI-protected policy signing key."""
@@ -85,6 +85,51 @@ class PolicyKeyManager:
                 self._cached_key = new_key
                 return self._cached_key
 
+    def rotate_signing_key(self) -> Tuple[bytes, bytes]:
+        """
+        Rotate the master policy signing key:
+        Archives previous key to .prev backup and generates fresh active key.
+        Returns: (old_key, new_key)
+        """
+        with self._lock:
+            old_key = self.get_signing_key()
+            new_key = secrets.token_bytes(32)
+
+            prev_key_path = self.key_path.with_suffix(".prev")
+            try:
+                if self.key_path.exists():
+                    prev_key_path.write_bytes(self.key_path.read_bytes())
+                protected_blob = self._dpapi_protect(new_key)
+                tmp_path = self.key_path.with_suffix(".tmp")
+                tmp_path.write_bytes(protected_blob)
+                os.replace(tmp_path, self.key_path)
+                self._cached_key = new_key
+                self._previous_key = old_key
+                logger.info(f"Policy signing key successfully rotated at {self.key_path}")
+                return old_key, new_key
+            except Exception as e:
+                logger.error(f"Failed rotating policy signing key: {e}")
+                self._cached_key = new_key
+                self._previous_key = old_key
+                return old_key, new_key
+
+    def get_previous_signing_key(self) -> Optional[bytes]:
+        """Retrieve previous signing key for backward-compatible verification during rotation."""
+        with self._lock:
+            if hasattr(self, "_previous_key") and self._previous_key:
+                return self._previous_key
+            prev_key_path = self.key_path.with_suffix(".prev")
+            if prev_key_path.exists():
+                try:
+                    blob = prev_key_path.read_bytes()
+                    decrypted = self._dpapi_unprotect(blob)
+                    if len(decrypted) == 32:
+                        self._previous_key = decrypted
+                        return self._previous_key
+                except Exception:
+                    pass
+            return None
+
     @staticmethod
     def _dpapi_protect(data: bytes) -> bytes:
         """Protect key using Windows DPAPI machine scope (CRYPTPROTECT_LOCAL_MACHINE)."""
@@ -104,10 +149,10 @@ class PolicyKeyManager:
                 ent_blob = DATA_BLOB(len(DPAPI_POLICY_ENTROPY), ctypes.cast(ent_buf, ctypes.POINTER(ctypes.c_byte)))
                 out_blob = DATA_BLOB()
 
-                # Flags: 5 = CRYPTPROTECT_LOCAL_MACHINE (0x04) | CRYPTPROTECT_UI_FORBIDDEN (0x01)
+                # Flags: 1 = CRYPTPROTECT_UI_FORBIDDEN (0x01)
                 status = crypt32.CryptProtectData(
-                    ctypes.byref(in_blob), "BI Antivirus Policy Signing Key",
-                    ctypes.byref(ent_blob), None, None, 5, ctypes.byref(out_blob)
+                    ctypes.byref(in_blob), None,
+                    ctypes.byref(ent_blob), None, None, 1, ctypes.byref(out_blob)
                 )
                 if status:
                     res = ctypes.string_at(out_blob.pbData, out_blob.cbData)

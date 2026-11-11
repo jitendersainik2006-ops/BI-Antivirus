@@ -44,12 +44,12 @@ class TestPatchAuditor(unittest.TestCase):
 
     def test_semantic_version_parsing(self):
         """Verify version string normalization to numeric integer tuples."""
-        self.assertEqual(parse_version_tuple("23.01"), (23, 1))
+        self.assertEqual(parse_version_tuple("23.01"), (23, 1, 0, 0))
         self.assertEqual(parse_version_tuple("7.3.2.1"), (7, 3, 2, 1))
         self.assertEqual(parse_version_tuple("v2.45.0.windows.1"), (2, 45, 0, 1))
         self.assertEqual(parse_version_tuple("125.0.6422.141"), (125, 0, 6422, 141))
-        self.assertEqual(parse_version_tuple(""), (0,))
-        self.assertEqual(parse_version_tuple("invalid"), (0,))
+        self.assertEqual(parse_version_tuple(""), (0, 0, 0, 0))
+        self.assertEqual(parse_version_tuple("invalid"), (0, 0, 0, 0))
 
     def test_version_vulnerability_boundary_checks(self):
         """Verify boundary comparisons for affected and fixed versions."""

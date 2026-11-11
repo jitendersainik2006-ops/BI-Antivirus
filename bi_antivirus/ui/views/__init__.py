@@ -9,6 +9,10 @@ from bi_antivirus.ui.views.firewall_view import FirewallView
 from bi_antivirus.ui.views.automation_view import AutomationView
 from bi_antivirus.ui.views.settings_view import SettingsView
 from bi_antivirus.ui.views.reports_view import ReportsView
+from bi_antivirus.ui.views.edr_view import EDRView
+from bi_antivirus.ui.views.patch_view import PatchView
+from bi_antivirus.ui.views.pe_view import PEClassifierView
+from bi_antivirus.ui.views.fleet_view import FleetView
 
 __all__ = [
     "OverviewView",
@@ -20,4 +24,8 @@ __all__ = [
     "AutomationView",
     "SettingsView",
     "ReportsView",
+    "EDRView",
+    "PatchView",
+    "PEClassifierView",
+    "FleetView",
 ]
