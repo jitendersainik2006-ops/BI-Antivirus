@@ -99,6 +99,11 @@ class FleetView(tk.Frame):
         self.notebook.add(self.tab_compliance, text="  📊 Compliance & Audit Trail  ")
         self._build_compliance_tab(self.tab_compliance)
 
+        # Tab 5: Hyper-V Sandbox POC
+        self.tab_sandbox = tk.Frame(self.notebook, bg=THEME["bg_darkest"])
+        self.notebook.add(self.tab_sandbox, text="  📦 Hyper-V Sandbox POC  ")
+        self._build_sandbox_tab(self.tab_sandbox)
+
     def _create_stat_card(self, parent, title: str, value: str, accent_color: str) -> tk.Frame:
         card = tk.Frame(parent, bg=THEME["bg_panel"], padx=14, pady=10)
         card.configure(highlightbackground=THEME["border"], highlightthickness=1)
@@ -140,14 +145,16 @@ class FleetView(tk.Frame):
             bg=THEME["bg_input"],
             fg=THEME["text_primary"],
             insertbackground=THEME["accent_primary"],
-            width=24,
+            width=20,
             relief="flat",
         )
-        self.search_entry.pack(side="left", padx=(0, 10))
+        self.search_entry.pack(side="left", padx=(0, 6))
         self.search_entry.bind("<Return>", lambda e: self._search_endpoints())
 
-        ttk.Button(toolbar, text="Find", command=self._search_endpoints).pack(side="left", padx=4)
-        ttk.Button(toolbar, text="Reset", command=self.refresh_data).pack(side="left", padx=4)
+        ttk.Button(toolbar, text="Find", command=self._search_endpoints).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="Reset", command=self.refresh_data).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="Approve Enrollment", command=self._approve_selected_enrollment).pack(side="left", padx=4)
+        ttk.Button(toolbar, text="Revoke Cert", command=self._revoke_selected_cert).pack(side="left", padx=2)
 
         # Action Buttons
         ttk.Button(toolbar, text="Enroll Local Host", command=self._enroll_local_endpoint).pack(side="right", padx=4)
@@ -158,7 +165,7 @@ class FleetView(tk.Frame):
         tree_frame = tk.Frame(parent, bg=THEME["bg_panel"])
         tree_frame.pack(fill="both", expand=True)
 
-        cols = ("id", "hostname", "ip", "os", "agent", "health", "policy", "isolation", "dept")
+        cols = ("id", "hostname", "ip", "os", "agent", "health", "cert", "policy", "isolation", "dept")
         self.ep_tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
         
         self.ep_tree.heading("id", text="Endpoint ID")
@@ -166,20 +173,22 @@ class FleetView(tk.Frame):
         self.ep_tree.heading("ip", text="IP Address")
         self.ep_tree.heading("os", text="OS Platform")
         self.ep_tree.heading("agent", text="Agent Ver")
-        self.ep_tree.heading("health", text="Health")
+        self.ep_tree.heading("health", text="Health / State")
+        self.ep_tree.heading("cert", text="mTLS Cert")
         self.ep_tree.heading("policy", text="Assigned Policy")
         self.ep_tree.heading("isolation", text="Isolation")
         self.ep_tree.heading("dept", text="Department")
 
-        self.ep_tree.column("id", width=120)
-        self.ep_tree.column("hostname", width=130)
-        self.ep_tree.column("ip", width=100)
-        self.ep_tree.column("os", width=110)
-        self.ep_tree.column("agent", width=80)
-        self.ep_tree.column("health", width=90)
-        self.ep_tree.column("policy", width=130)
-        self.ep_tree.column("isolation", width=80)
-        self.ep_tree.column("dept", width=100)
+        self.ep_tree.column("id", width=110)
+        self.ep_tree.column("hostname", width=120)
+        self.ep_tree.column("ip", width=95)
+        self.ep_tree.column("os", width=100)
+        self.ep_tree.column("agent", width=75)
+        self.ep_tree.column("health", width=95)
+        self.ep_tree.column("cert", width=85)
+        self.ep_tree.column("policy", width=120)
+        self.ep_tree.column("isolation", width=75)
+        self.ep_tree.column("dept", width=90)
 
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.ep_tree.yview)
         self.ep_tree.configure(yscrollcommand=scrollbar.set)
@@ -194,6 +203,7 @@ class FleetView(tk.Frame):
 
         ttk.Button(toolbar, text="Refresh Policies", command=self._load_policies).pack(side="left", padx=4)
         ttk.Button(toolbar, text="Assign Selected Policy to Endpoint", command=self._assign_policy_dialog).pack(side="left", padx=6)
+        ttk.Button(toolbar, text="Emergency Approved Rollback", command=self._rollback_policy_dialog).pack(side="left", padx=6)
 
         tree_frame = tk.Frame(parent, bg=THEME["bg_panel"])
         tree_frame.pack(fill="both", expand=True)
@@ -310,6 +320,7 @@ class FleetView(tk.Frame):
         self._load_policies()
         self._load_incidents()
         self._load_audit_trail()
+        self._load_sandbox_history()
 
     def _load_endpoints(self, endpoints: Optional[List[Any]] = None) -> None:
         for item in self.ep_tree.get_children():
@@ -318,6 +329,9 @@ class FleetView(tk.Frame):
         eps = endpoints if endpoints is not None else self.fleet_manager.db.list_endpoints()
         for ep in eps:
             d = ep.to_dict() if hasattr(ep, "to_dict") else ep
+            ep_id = d.get("id", "")
+            cert = self.fleet_manager.db.get_certificate_by_endpoint(ep_id)
+            cert_status = cert.status if cert else "NONE"
             self.ep_tree.insert(
                 "",
                 "end",
@@ -328,6 +342,7 @@ class FleetView(tk.Frame):
                     d.get("os_version")[:16],
                     d.get("agent_version"),
                     d.get("health_status"),
+                    cert_status,
                     d.get("assigned_policy_id"),
                     "ISOLATED" if d.get("isolation_status") else "NORMAL",
                     d.get("department"),
@@ -506,3 +521,203 @@ class FleetView(tk.Frame):
             messagebox.showinfo("Compliance Report Exported", f"Successfully exported compliance report to:\n{dest}")
         except Exception as e:
             messagebox.showerror("Export Failed", f"Failed generating report: {e}")
+
+    # --- Tab 5: Hyper-V Sandbox POC ---
+
+    def _build_sandbox_tab(self, parent: tk.Frame) -> None:
+        toolbar = tk.Frame(parent, bg=THEME["bg_darkest"], pady=8)
+        toolbar.pack(fill="x")
+
+        ttk.Button(toolbar, text="Analyze Harmless Sample in Sandbox", command=self._run_sandbox_sample_dialog).pack(side="left", padx=4)
+        ttk.Button(toolbar, text="Refresh Sandbox History", command=self._load_sandbox_history).pack(side="left", padx=4)
+
+        # Hyper-V Availability & Status Banner
+        hv_info = self.fleet_manager.sandbox.check_hyperv_availability()
+        banner_bg = THEME["status_safe"] if hv_info.get("hyperv_available") else THEME["bg_panel"]
+        banner = tk.Frame(parent, bg=banner_bg, padx=12, pady=8)
+        banner.pack(fill="x", pady=(0, 8))
+
+        status_text = (
+            f"Hyper-V Isolation Mode: {hv_info.get('isolation_mode_supported')} | "
+            f"{hv_info.get('status_summary')} | "
+            f"Containment Boundaries: Internal Virtual Switch (Zero LAN/WAN), 2048 MB RAM cap, 60s Timeout"
+        )
+        tk.Label(
+            banner,
+            text=status_text,
+            bg=banner_bg,
+            fg=THEME["text_primary"] if not hv_info.get("hyperv_available") else "#000000",
+            font=(THEME["font_family"], 9, "bold"),
+            anchor="w",
+        ).pack(fill="x")
+
+        # Treeview for Sandbox Audits
+        tree_frame = tk.Frame(parent, bg=THEME["bg_panel"])
+        tree_frame.pack(fill="both", expand=True)
+
+        cols = ("audit_id", "sample", "verdict", "duration", "mode", "exit_code", "timestamp")
+        self.sbx_tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
+
+        self.sbx_tree.heading("audit_id", text="Audit ID")
+        self.sbx_tree.heading("sample", text="Sample Name")
+        self.sbx_tree.heading("verdict", text="Verdict")
+        self.sbx_tree.heading("duration", text="Duration")
+        self.sbx_tree.heading("mode", text="Isolation Mode")
+        self.sbx_tree.heading("exit_code", text="Exit Code")
+        self.sbx_tree.heading("timestamp", text="Executed At")
+
+        self.sbx_tree.column("audit_id", width=140)
+        self.sbx_tree.column("sample", width=180)
+        self.sbx_tree.column("verdict", width=95)
+        self.sbx_tree.column("duration", width=75)
+        self.sbx_tree.column("mode", width=150)
+        self.sbx_tree.column("exit_code", width=75)
+        self.sbx_tree.column("timestamp", width=140)
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.sbx_tree.yview)
+        self.sbx_tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.sbx_tree.pack(side="left", fill="both", expand=True)
+
+    def _load_sandbox_history(self) -> None:
+        if not hasattr(self, "sbx_tree"):
+            return
+        for item in self.sbx_tree.get_children():
+            self.sbx_tree.delete(item)
+
+        records = self.fleet_manager.sandbox.get_sandbox_history(limit=50)
+        for r in records:
+            t_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(r.timestamp))
+            self.sbx_tree.insert(
+                "",
+                "end",
+                values=(
+                    r.audit_id,
+                    r.sample_name,
+                    r.verdict,
+                    f"{r.duration_seconds}s",
+                    r.isolation_mode,
+                    r.exit_code,
+                    t_str,
+                ),
+            )
+
+    def _approve_selected_enrollment(self) -> None:
+        sel = self.ep_tree.selection()
+        if not sel:
+            messagebox.showwarning("Selection Required", "Please select an endpoint awaiting approval.")
+            return
+
+        item = self.ep_tree.item(sel[0])
+        ep_id = item["values"][0]
+        hostname = item["values"][1]
+
+        if not messagebox.askyesno(
+            "Approve Enrollment",
+            f"Authorize enrollment and issue mTLS client certificate for:\n\n{hostname} ({ep_id})?",
+        ):
+            return
+
+        ok, state, data = self.fleet_manager.enrollment.approve_enrollment(
+            endpoint_id=ep_id,
+            admin_token=self.fleet_manager.admin_token,
+            admin_id="admin_ui",
+        )
+        if ok:
+            messagebox.showinfo("Enrollment Approved", f"Endpoint {ep_id} is now ACTIVE.\nmTLS Certificate issued successfully.")
+            self.refresh_data()
+        else:
+            messagebox.showerror("Approval Failed", f"Could not approve enrollment: {state}")
+
+    def _revoke_selected_cert(self) -> None:
+        sel = self.ep_tree.selection()
+        if not sel:
+            messagebox.showwarning("Selection Required", "Please select an endpoint to revoke certificate.")
+            return
+
+        item = self.ep_tree.item(sel[0])
+        ep_id = item["values"][0]
+        hostname = item["values"][1]
+
+        if not messagebox.askyesno(
+            "Confirm Revocation",
+            f"Are you sure you want to REVOKE the mTLS certificate for:\n\n{hostname} ({ep_id})?\n\nThis will immediately terminate mutual authentication.",
+        ):
+            return
+
+        ok, msg = self.fleet_manager.enrollment.revoke_endpoint(
+            endpoint_id=ep_id,
+            admin_token=self.fleet_manager.admin_token,
+            reason="Revocation requested from Enterprise UI",
+            admin_id="admin_ui",
+        )
+        if ok:
+            messagebox.showinfo("Certificate Revoked", f"Endpoint {ep_id} and its certificate are now REVOKED.")
+            self.refresh_data()
+        else:
+            messagebox.showerror("Revocation Failed", f"Revocation failed: {msg}")
+
+    def _rollback_policy_dialog(self) -> None:
+        sel_pol = self.pol_tree.selection()
+        sel_ep = self.ep_tree.selection()
+
+        if not sel_pol:
+            messagebox.showwarning("Policy Required", "Please select a target policy to rollback to.")
+            return
+        if not sel_ep:
+            messagebox.showwarning("Endpoint Required", "Please select the target endpoint from the Endpoints Directory tab.")
+            return
+
+        pol_id = self.pol_tree.item(sel_pol[0])["values"][0]
+        ep_id = self.ep_tree.item(sel_ep[0])["values"][0]
+
+        if not messagebox.askyesno(
+            "Emergency Approved Rollback",
+            f"Authorize emergency policy rollback to {pol_id} for endpoint {ep_id}?\n\nThis overrides monotonic version checks and issues a signed administrative authorization token.",
+        ):
+            return
+
+        ok, msg, bundle = self.fleet_manager.policy_distributor.create_approved_rollback(
+            target_policy_id=pol_id,
+            endpoint_ids=[ep_id],
+            admin_token=self.fleet_manager.admin_token,
+            reason="Operator emergency rollback override via UI",
+            admin_id="admin_ui",
+        )
+        if ok:
+            messagebox.showinfo("Rollback Authorized", f"Rollback successfully authorized and staged for {ep_id}:\n{msg}")
+            self.refresh_data()
+        else:
+            messagebox.showerror("Rollback Failed", f"Could not authorize rollback: {msg}")
+
+    def _run_sandbox_sample_dialog(self) -> None:
+        file_path = filedialog.askopenfilename(
+            title="Select Harmless Sample for Isolated Sandbox Execution",
+            filetypes=[
+                ("Executable or Script", "*.exe;*.py;*.txt;*.bat;*.ps1"),
+                ("All Files", "*.*"),
+            ],
+        )
+        if not file_path:
+            return
+
+        ok, msg, record = self.fleet_manager.sandbox.execute_harmless_sample(
+            sample_path=Path(file_path),
+            admin_token=self.fleet_manager.admin_token,
+            timeout_seconds=30.0,
+            admin_id="admin_ui",
+        )
+        if ok and record:
+            messagebox.showinfo(
+                "Sandbox Execution Complete",
+                f"Sample: {record.sample_name}\n"
+                f"Verdict: {record.verdict}\n"
+                f"Duration: {record.duration_seconds}s\n"
+                f"Mode: {record.isolation_mode}\n"
+                f"Exit Code: {record.exit_code}\n\n"
+                f"Audit ID: {record.audit_id}",
+            )
+            self._load_sandbox_history()
+        else:
+            messagebox.showerror("Sandbox Error", f"Sandbox execution failed: {msg}")
+

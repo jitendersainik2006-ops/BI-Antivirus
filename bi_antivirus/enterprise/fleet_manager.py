@@ -19,6 +19,9 @@ from bi_antivirus.enterprise.fleet_models import (
     FleetEvent,
     AdminAuditEntry,
     FleetIncident,
+    CertificateRecord,
+    PolicyReceipt,
+    SandboxAuditRecord,
 )
 from bi_antivirus.enterprise.fleet_database import FleetDatabase
 from bi_antivirus.config import (
@@ -75,13 +78,97 @@ class FleetManager:
         fleet_db: Optional[FleetDatabase] = None,
         master_enrollment_key: Optional[str] = None,
         admin_token: Optional[str] = None,
+        pki_manager: Optional[Any] = None,
     ):
         self.db = fleet_db or FleetDatabase()
         self.master_enrollment_key = master_enrollment_key or self._load_or_create_enrollment_key()
         self.admin_token = admin_token or self._load_or_create_admin_token()
+        self._pki = pki_manager
+        self._enrollment = None
+        self._policy_distributor = None
+        self._sandbox = None
 
         # Initialize Default Baseline Policy if none exists
         self._ensure_baseline_policy()
+
+    @property
+    def pki(self):
+        """Lazy PKI Certificate Manager."""
+        if self._pki is None:
+            from bi_antivirus.enterprise.pki_manager import PKIManager
+            self._pki = PKIManager(fleet_db=self.db)
+        return self._pki
+
+    @property
+    def enrollment(self):
+        """Lazy Enrollment Manager."""
+        if self._enrollment is None:
+            from bi_antivirus.enterprise.enrollment_manager import EnrollmentManager
+            self._enrollment = EnrollmentManager(
+                self.db,
+                self.pki,
+                self.master_enrollment_key,
+                self.admin_token,
+            )
+        return self._enrollment
+
+    @property
+    def policy_distributor(self):
+        """Lazy Policy Distributor."""
+        if self._policy_distributor is None:
+            from bi_antivirus.enterprise.policy_distributor import PolicyDistributor
+            self._policy_distributor = PolicyDistributor(self.db, self.admin_token)
+        return self._policy_distributor
+
+    @property
+    def sandbox(self):
+        """Lazy Hyper-V Sandbox Manager."""
+        if self._sandbox is None:
+            from bi_antivirus.enterprise.sandbox_manager import HyperVSandboxManager
+            self._sandbox = HyperVSandboxManager(self.db, self.admin_token)
+        return self._sandbox
+
+    def handle_mtls_request(
+        self,
+        endpoint_id: str,
+        action: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Unified dispatch router for requests arriving over the mTLS transport.
+        Handles HEARTBEAT, GET_PENDING_POLICY, POLICY_ACK, and REPORT_EVENT.
+        """
+        if action == "HEARTBEAT":
+            health = payload.get("health_status", "HEALTHY")
+            self.record_heartbeat(endpoint_id, health)
+            # Check if policy update is pending
+            pending_pol = self.policy_distributor.get_pending_bundle(endpoint_id)
+            return {
+                "heartbeat": "ACK",
+                "endpoint_id": endpoint_id,
+                "has_pending_policy": pending_pol is not None,
+                "server_time": time.time(),
+            }
+
+        elif action == "GET_PENDING_POLICY":
+            pending = self.policy_distributor.get_pending_bundle(endpoint_id)
+            return {"policy_bundle": pending}
+
+        elif action == "POLICY_ACK":
+            receipt_data = payload.get("receipt", {})
+            receipt = PolicyReceipt.from_dict(receipt_data)
+            ok, msg = self.policy_distributor.process_acknowledgement(endpoint_id, receipt)
+            return {"success": ok, "message": msg}
+
+        elif action == "REPORT_EVENT":
+            ev_type = payload.get("event_type", "INFO")
+            severity = payload.get("severity", "LOW")
+            ev_payload = payload.get("payload", {})
+            ok = self.record_endpoint_event(endpoint_id, ev_type, severity, ev_payload)
+            return {"recorded": ok}
+
+        else:
+            return {"error": f"Unknown mTLS action: {action}"}
 
     def _load_or_create_enrollment_key(self) -> str:
         """Derive or load stable master enrollment key for agent authentication."""

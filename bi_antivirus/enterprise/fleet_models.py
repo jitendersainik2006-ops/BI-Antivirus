@@ -197,3 +197,113 @@ class FleetIncident:
             created_at=float(data.get("created_at", time.time())),
             updated_at=float(data.get("updated_at", time.time())),
         )
+
+
+@dataclass
+class CertificateRecord:
+    """X.509 Certificate tracking record for local PKI and mTLS authentication."""
+    serial_number: str
+    endpoint_id: str
+    common_name: str
+    certificate_type: str  # CA, SERVER, CLIENT
+    status: str = "ACTIVE"  # PENDING_APPROVAL, APPROVED, ACTIVE, REVOKED, EXPIRED
+    issued_at: float = field(default_factory=time.time)
+    expires_at: float = field(default_factory=time.time)
+    revoked_at: Optional[float] = None
+    revocation_reason: str = ""
+    cert_path: str = ""
+    fingerprint_sha256: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CertificateRecord":
+        return cls(
+            serial_number=str(data["serial_number"]),
+            endpoint_id=data.get("endpoint_id", ""),
+            common_name=data.get("common_name", ""),
+            certificate_type=data.get("certificate_type", "CLIENT"),
+            status=data.get("status", "ACTIVE"),
+            issued_at=float(data.get("issued_at", time.time())),
+            expires_at=float(data.get("expires_at", time.time())),
+            revoked_at=float(data["revoked_at"]) if data.get("revoked_at") is not None else None,
+            revocation_reason=data.get("revocation_reason", ""),
+            cert_path=data.get("cert_path", ""),
+            fingerprint_sha256=data.get("fingerprint_sha256", ""),
+        )
+
+
+@dataclass
+class PolicyReceipt:
+    """Cryptographic acknowledgement and audit record of policy application."""
+    receipt_id: str
+    endpoint_id: str
+    policy_id: str
+    version: int
+    status: str  # APPLIED, REJECTED, ROLLED_BACK
+    applied_at: float = field(default_factory=time.time)
+    hmac_signature: str = ""
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "PolicyReceipt":
+        details = data.get("details", {})
+        if isinstance(details, str):
+            try:
+                details = json.loads(details)
+            except Exception:
+                details = {}
+        return cls(
+            receipt_id=data["receipt_id"],
+            endpoint_id=data["endpoint_id"],
+            policy_id=data["policy_id"],
+            version=int(data.get("version", 1)),
+            status=data.get("status", "APPLIED"),
+            applied_at=float(data.get("applied_at", time.time())),
+            hmac_signature=data.get("hmac_signature", ""),
+            details=details,
+        )
+
+
+@dataclass
+class SandboxAuditRecord:
+    """Execution telemetry record for isolated sandbox verification."""
+    audit_id: str
+    sample_name: str
+    sample_sha256: str
+    hyperv_available: bool
+    isolation_mode: str  # HYPERV_ISOLATED, LOCAL_CONTAINMENT_SIM
+    duration_seconds: float
+    exit_code: int
+    verdict: str  # BENIGN, SUSPICIOUS, MALICIOUS, TIMEOUT, ABORTED
+    timestamp: float = field(default_factory=time.time)
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SandboxAuditRecord":
+        details = data.get("details", {})
+        if isinstance(details, str):
+            try:
+                details = json.loads(details)
+            except Exception:
+                details = {}
+        return cls(
+            audit_id=data["audit_id"],
+            sample_name=data.get("sample_name", "unknown"),
+            sample_sha256=data.get("sample_sha256", ""),
+            hyperv_available=bool(data.get("hyperv_available", False)),
+            isolation_mode=data.get("isolation_mode", "LOCAL_CONTAINMENT_SIM"),
+            duration_seconds=float(data.get("duration_seconds", 0.0)),
+            exit_code=int(data.get("exit_code", 0)),
+            verdict=data.get("verdict", "BENIGN"),
+            timestamp=float(data.get("timestamp", time.time())),
+            details=details,
+        )
+

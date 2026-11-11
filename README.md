@@ -4,7 +4,7 @@
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-1.1.0--PRO-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-136%2F136%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-169%2F169%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -58,11 +58,14 @@ The primary architectural mandate is **strict non-destructive security and local
 | **Compliance & Posture Reporter** | Aggregates fleet health %, detection metrics, CVE patch status, BitLocker volume posture; exports Markdown and JSON reports with mandatory legal/regulatory disclaimers. | **VERIFIED (Markdown & JSON Export)** |
 | **False-Positive Benchmarking** | Repeatable harmless synthetic test corpus, achieving 0.0% false-positive rate, 0 crashes on malformed PEs, sub-2ms evaluation latency, and bounded memory footprint. | **VERIFIED (0.0% FP Benchmark)** |
 | **Signed Update Key Rotation** | DPAPI-protected signing key rotation with previous-key verification fallback for backward compatibility, atomic database write rollback, and safe non-overwrite quarantine restoration. | **VERIFIED (Key Rotation & Rollback Safe)** |
-| **Enterprise Fleet GUI Center** | Dedicated 4-tab control center in `dashboard.py` (`🏢  Enterprise Fleet`) for live endpoint inventory, policy rollout, incident containment, and compliance exports. | **VERIFIED (Interactive GUI)** |
+| **Enterprise PKI & Mutual TLS (mTLS)** | Dedicated local X.509 Certificate Authority (CA), mutual certificate enforcement (`ssl.CERT_REQUIRED`), Subject CN bound to Endpoint ID, 60s sliding-window replay protection, and 60 req/min rate limiting. | **VERIFIED (mTLS 1.2/1.3 Authenticated)** |
+| **Controlled Endpoint Enrollment** | Multi-state lifecycle (`PENDING_APPROVAL` -> `ACTIVE` -> `REVOKED`), hardware fingerprinting (`SHA-256(hostname\|mac\|os)`), duplicate spoof detection, explicit re-enrollment authorization, and audit trail. | **VERIFIED (Zero-Trust Enrollment)** |
+| **Policy Distribution & Approved Rollback** | Cryptographically signed bundles with monotonic sequence verification ($v_{\text{new}} > v_{\text{current}}$), cryptographic receipts, and emergency administrator-approved rollback override tokens. | **VERIFIED (Approved Rollback Override)** |
+| **Hyper-V Sandbox Proof of Concept** | Disposable isolated VM architecture (Internal Virtual Switch only, zero host folder sharing, RAM $\le 2048$MB, vCPU $\le 2$, timeout $\le 60$s, snapshot revert), harmless synthetic sample execution, and dual-mode simulation. | **VERIFIED (Isolated Sandbox POC)** |
+| **Enterprise Fleet GUI Center** | 5-tab control center in `dashboard.py` (`🏢  Enterprise Fleet`) featuring live endpoints directory, mTLS certificate health, policy rollout & rollback dialogs, EDR incidents, compliance exports, and Hyper-V sandbox management. | **VERIFIED (Interactive 5-Tab GUI)** |
 
 ### Planned Future Features (Roadmap)
 - **Kernel Mini-Filter Driver**: Transitioning filesystem interception from user-space polling to a certified Windows Kernel Mini-Filter Driver for instantaneous I/O pre-execution blocking.
-- **Local Detonation Sandbox**: Automated execution of suspicious binaries in a disposable Windows Hyper-V container for dynamic behavioral analysis.
 - **Decentralized Threat Intelligence**: Optional peer-to-peer threat definition sharing between localized BI Antivirus nodes.
 - **Embedded Machine Learning Classifier**: Sub-millisecond static classification using an embedded local ONNX machine-learning model without cloud inference.
 
@@ -320,21 +323,21 @@ flowchart LR
 
 ## 11. Automated Test Results
 
-The platform includes a 70-test automated validation suite (`run_tests.py`):
+The platform includes a comprehensive 169-test automated validation suite executed across 28 test modules (`python -m unittest discover -s bi_antivirus/tests -p "test_*.py"`):
 
 ```
 ======================================================================
-      BI ANTIVIRUS - AUTOMATED VALIDATION TEST SUITE
+      BI ANTIVIRUS - COMPREHENSIVE AUTOMATED TEST SUITE
 ======================================================================
-Ran 70 tests in 4.120s
+Ran 169 tests in 45.598s
 
 OK
 ======================================================================
-Tests Run:      70
+Tests Run:      169
 Failures:       0
 Errors:         0
 Skipped:        0
-Overall Status: SUCCESS (ALL TESTS PASSED)
+Overall Status: SUCCESS (100% PASS RATE)
 ======================================================================
 ```
 

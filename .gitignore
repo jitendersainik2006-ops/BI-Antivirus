@@ -10,6 +10,9 @@ data/api_key.txt
 *.token
 *.secret
 *.dpapi
+*.crt
+*.csr
+*.srl
 data/vault_master.*
 
 # 2. Environment Files & Secret Configurations
@@ -27,14 +30,8 @@ data/n8n/.n8n/config
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
-data/*.db
-data/n8n/
-data/n8n/**
-data/settings.json
-data/enterprise_policy.*
-data/backups/
-data/crypto_test_scratch/
-data/binaryData/
+data/
+data/**
 
 # 4. Reversible Encrypted Quarantine Vault (.biq)
 quarantine/
