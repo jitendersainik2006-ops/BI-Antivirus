@@ -99,6 +99,14 @@ class QuarantineView(tk.Frame):
         )
         self.btn_purge.pack(side="left", padx=(0, 10))
 
+        self.btn_verify = ttk.Button(
+            toolbar,
+            text="Verify Vault Integrity",
+            style="Secondary.TButton",
+            command=self._on_verify_integrity,
+        )
+        self.btn_verify.pack(side="left", padx=(0, 10))
+
         self.btn_refresh = ttk.Button(
             toolbar,
             text="Refresh Vault",
@@ -106,6 +114,25 @@ class QuarantineView(tk.Frame):
             command=self.refresh_data,
         )
         self.btn_refresh.pack(side="right")
+
+    def _on_verify_integrity(self) -> None:
+        """Execute physical vault integrity audit against disk files."""
+        res = self.engine.quarantine_mgr.verify_vault_integrity()
+        status_msg = (
+            f"Quarantine Vault Physical Audit Results:\n\n"
+            f"• Total Active Records: {res['total_records']}\n"
+            f"• Verified Intact on Disk: {res['intact_records']}\n"
+            f"• Missing Vault Files: {res['missing_records']}\n"
+            f"• Corrupt / Invalid Files: {res['corrupt_records']}\n\n"
+            f"Vault Status: {'HEALTHY - All records verified' if res['all_healthy'] else 'WARNING - Issues detected'}"
+        )
+        if res.get("issues"):
+            status_msg += "\n\nIssues Identified:\n" + "\n".join(res["issues"][:5])
+
+        if res["all_healthy"]:
+            messagebox.showinfo("Quarantine Vault Integrity", status_msg)
+        else:
+            messagebox.showwarning("Quarantine Vault Warning", status_msg)
 
     def refresh_data(self) -> None:
         """Query quarantine records and repopulate table."""

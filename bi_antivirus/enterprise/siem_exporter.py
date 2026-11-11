@@ -210,3 +210,43 @@ class SIEMExporter:
     def format_json(entry: Dict[str, Any]) -> str:
         """Format event as structured JSON Line."""
         return json.dumps(entry, sort_keys=True)
+
+    def export_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Export a security event to SIEM format, cryptographically chaining the entry.
+        Returns a dict with format, payload, hash, and sequence.
+        """
+        event_type = event_data.get("event_type", "SECURITY_EVENT")
+        action = event_data.get("action", event_data.get("message", "SIEM Export"))
+        severity = event_data.get("severity", "INFO")
+        actor = event_data.get("actor", event_data.get("source", "SYSTEM"))
+        details = {k: v for k, v in event_data.items() if k not in ("event_type", "action", "severity", "actor", "timestamp")}
+        ts = event_data.get("timestamp", time.time())
+
+        entry = self.record_audit_entry(
+            event_type=event_type,
+            action=action,
+            actor=actor,
+            severity=severity,
+            details=details,
+            timestamp=ts,
+        )
+
+        cef = self.format_cef(
+            name=action,
+            severity=7 if severity in ("HIGH", "CRITICAL") else 3,
+            extension_dict=details,
+        )
+        syslog = self.format_rfc5424_syslog(
+            message=action,
+            severity=3 if severity in ("HIGH", "CRITICAL") else 6,
+        )
+
+        return {
+            "success": True,
+            "hash": entry.current_hash,
+            "sequence_id": entry.sequence_id,
+            "cef": cef,
+            "syslog": syslog,
+        }
+

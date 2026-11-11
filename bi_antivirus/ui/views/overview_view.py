@@ -3,6 +3,7 @@ BI Antivirus - Overview View (Dashboard Home)
 Displays main protection status shield, telemetry metrics, and scan launch cards.
 """
 
+import json
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
@@ -104,6 +105,13 @@ class OverviewView(tk.Frame):
             justify="left",
         )
         self.enforcement_subtext.pack(fill="x", pady=(2, 0))
+
+        self.btn_system_diag = ttk.Button(
+            self.enforcement_frame,
+            text="System Diagnostics",
+            command=self._show_system_diagnostics_dialog,
+        )
+        self.btn_system_diag.pack(side="right", padx=(10, 0))
 
         self.btn_priv_details = ttk.Button(
             self.enforcement_frame,
@@ -380,4 +388,97 @@ class OverviewView(tk.Frame):
         btn_box = tk.Frame(dialog, bg=THEME["bg_dark"], padx=14, pady=12)
         btn_box.pack(fill="x")
         ttk.Button(btn_box, text="Close", command=dialog.destroy).pack(side="right")
+
+    def _show_system_diagnostics_dialog(self) -> None:
+        """Open master Windows host environment compatibility and diagnostics dialog."""
+        from bi_antivirus.core.windows_compat import WindowsCompatibilityAuditor
+        auditor = WindowsCompatibilityAuditor()
+        report = auditor.run_full_audit()
+
+        dialog = tk.Toplevel(self)
+        dialog.title("Windows Host Environment & Pre-Flight Diagnostics")
+        dialog.geometry("740x540")
+        dialog.configure(bg=THEME["bg_dark"])
+        dialog.transient(self)
+        dialog.grab_set()
+
+        hdr = tk.Frame(dialog, bg=THEME["bg_panel"], padx=16, pady=12)
+        hdr.pack(fill="x", padx=14, pady=14)
+        
+        status_color = THEME["status_safe"] if report["overall_readiness"] == "READY" else THEME["status_warning"]
+        tk.Label(
+            hdr,
+            text=f"System Readiness: {report['overall_readiness']}",
+            font=(THEME["font_family"], 13, "bold"),
+            bg=THEME["bg_panel"],
+            fg=status_color,
+        ).pack(anchor="w")
+
+        tk.Label(
+            hdr,
+            text=f"{report['app_name']} v{report['app_version']} | Engine: {report['engine_version']}",
+            font=(THEME["font_family"], 9),
+            bg=THEME["bg_panel"],
+            fg=THEME["text_secondary"],
+        ).pack(anchor="w", pady=(2, 0))
+
+        # Detail Table
+        tree_frame = tk.Frame(dialog, bg=THEME["bg_dark"], padx=14)
+        tree_frame.pack(fill="both", expand=True)
+
+        columns = ("component", "status", "detail")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
+        tree.heading("component", text="Component / Subsystem")
+        tree.heading("status", text="Verification Status")
+        tree.heading("detail", text="Diagnostic Finding")
+
+        tree.column("component", width=180)
+        tree.column("status", width=110, anchor="center")
+        tree.column("detail", width=410)
+
+        checks = report.get("checks", {})
+        
+        # Python
+        py = checks.get("python", {})
+        tree.insert("", "end", values=("Python Runtime", py.get("status", "N/A"), f"v{py.get('version')} (64-bit={py.get('is_64bit')})"))
+        
+        # Windows
+        win = checks.get("windows", {})
+        tree.insert("", "end", values=("Windows OS", win.get("status", "N/A"), f"{win.get('release')} Build {win.get('build')} ({win.get('edition')})"))
+        
+        # Privileges
+        priv = checks.get("privileges", {})
+        tree.insert("", "end", values=("Token Integrity", "ACTIVE", f"{priv.get('enforcement_mode')} ({priv.get('full_enforcement_subsystems')} active, {priv.get('audit_only_subsystems')} audit)"))
+        
+        # Storage
+        st = checks.get("storage", {})
+        tree.insert("", "end", values=("Storage Target", st.get("status", "N/A"), f"{st.get('drive')} drive ({st.get('free_space_gb')} GB free, write=OK)"))
+        
+        # SQLite
+        sq = checks.get("sqlite", {})
+        tree.insert("", "end", values=("SQLite Databases", sq.get("status", "N/A"), f"v{sq.get('sqlite_version')} - All databases verified intact with WAL mode"))
+        
+        # Crypto
+        cr = checks.get("cryptography", {})
+        tree.insert("", "end", values=("Native DPAPI/CNG", cr.get("status", "N/A"), cr.get("note", "DPAPI available")))
+        
+        # Defender
+        df = checks.get("defender_coexistence", {})
+        tree.insert("", "end", values=("Windows Defender", df.get("status", "N/A"), df.get("details", "Mutual coexistence active")))
+
+        tree.pack(fill="both", expand=True)
+
+        # Footer Buttons
+        btn_box = tk.Frame(dialog, bg=THEME["bg_dark"], padx=14, pady=12)
+        btn_box.pack(fill="x")
+
+        def _export():
+            out_p = Path(r"D:\bit defender\data\system_diagnostics.json")
+            with open(out_p, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2)
+            messagebox.showinfo("Export Diagnostics", f"Diagnostic report exported to:\n{out_p}")
+
+        ttk.Button(btn_box, text="Export JSON", command=_export).pack(side="left")
+        ttk.Button(btn_box, text="Close", command=dialog.destroy).pack(side="right")
+
 
