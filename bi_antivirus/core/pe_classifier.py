@@ -125,18 +125,17 @@ class PEClassifier:
         """Alias for analyze_file."""
         return self.analyze_file(file_path)
 
-    def analyze_file(self, file_path: Path) -> Dict[str, Any]:
+    def analyze_bytes(self, raw_bytes: bytes, file_name: str = "in_memory.exe", file_path: Optional[str] = None) -> Dict[str, Any]:
         """
-        Analyze a local file statically.
+        Analyze a PE binary directly from raw bytes in memory.
         Returns a rich structural dictionary with headers, mitigations, sections,
         imports, overlay, risk score, and explainable classification.
         """
-        path_obj = Path(file_path)
         base_result = {
-            "file_path": str(path_obj),
-            "file_name": path_obj.name,
-            "file_size": 0,
-            "sha256": "",
+            "file_path": file_path or f"memory://{file_name}",
+            "file_name": file_name,
+            "file_size": len(raw_bytes),
+            "sha256": hashlib.sha256(raw_bytes).hexdigest() if raw_bytes else "",
             "is_pe": False,
             "format": "NON_PE",
             "is_pe64": False,
@@ -151,21 +150,26 @@ class PEClassifier:
                 "force_integrity": False,
             },
             "authenticode_present": False,
+            "data_directories": {
+                "SECURITY": {"present": False}
+            },
             "sections": [],
             "sections_count": 0,
             "rwx_sections": [],
             "high_entropy_sections": [],
             "packer_sections": [],
+            "has_packer_sections": False,
             "imports": {},
             "suspicious_apis": [],
             "suspicious_categories": [],
+            "suspicious_apis_by_category": {},
             "exports_count": 0,
             "overlay": {
                 "present": False,
                 "size": 0,
                 "entropy": 0.0,
             },
-            "overall_entropy": 0.0,
+            "overall_entropy": calculate_entropy(raw_bytes),
             "risk_score": 0,
             "suspicion_score": 0,
             "confidence": 0.5,
@@ -179,32 +183,11 @@ class PEClassifier:
             "error": None,
         }
 
-        if not path_obj.exists() or not path_obj.is_file():
-            base_result["error"] = "File does not exist or is not a regular file."
-            return base_result
-
-        # Protect against unbounded memory consumption on oversized files (> 150MB)
-        try:
-            st_size = path_obj.stat().st_size
-            if st_size > 150 * 1024 * 1024:
-                base_result["error"] = f"File exceeds maximum analysis size (150MB): {st_size} bytes."
-                base_result["verdict"] = "SKIPPED_OVERSIZED"
-                base_result["classification"] = "SKIPPED_OVERSIZED"
-                return base_result
-        except Exception as e:
-            base_result["error"] = f"Failed inspecting file size: {e}"
+        if len(raw_bytes) < 64:
+            base_result["error"] = "Data too small to contain a valid DOS header."
             return base_result
 
         try:
-            raw_bytes = path_obj.read_bytes()
-            base_result["file_size"] = len(raw_bytes)
-            base_result["sha256"] = hashlib.sha256(raw_bytes).hexdigest()
-            base_result["overall_entropy"] = calculate_entropy(raw_bytes)
-
-            if len(raw_bytes) < 64:
-                base_result["error"] = "File too small to contain a valid DOS header."
-                return base_result
-
             # 1. DOS Header Check
             if raw_bytes[:2] != b"MZ":
                 base_result["error"] = "Invalid DOS header magic (missing 'MZ')."
@@ -212,7 +195,7 @@ class PEClassifier:
 
             e_lfanew = struct.unpack_from("<I", raw_bytes, 0x3C)[0]
             if e_lfanew + 4 > len(raw_bytes):
-                base_result["error"] = "Malformed PE: e_lfanew points beyond file size."
+                base_result["error"] = "Malformed PE: e_lfanew points beyond data size."
                 return base_result
 
             # 2. PE Signature Check
@@ -255,8 +238,6 @@ class PEClassifier:
                 base_result["format"] = "PE32+ (64-bit)" if is_pe64 else "PE32 (32-bit)"
 
                 # Parse Subsystem and DllCharacteristics
-                # In PE32, Subsystem is at offset 68, DllCharacteristics at 70
-                # In PE32+, Subsystem is at offset 68, DllCharacteristics at 70
                 if size_opt_hdr >= 72:
                     subsystem, dll_chars = struct.unpack_from("<HH", raw_bytes, opt_offset + 68)
                     base_result["subsystem"] = "GUI" if subsystem == 2 else ("CLI" if subsystem == 3 else f"Subsystem_{subsystem}")
@@ -282,6 +263,8 @@ class PEClassifier:
                 # Security / Certificate directory is index 4
                 if len(data_dirs) > 4 and data_dirs[4][1] > 0:
                     base_result["authenticode_present"] = True
+                    base_result["has_authenticode"] = True
+                    base_result["data_directories"]["SECURITY"]["present"] = True
 
                 export_dir_rva = data_dirs[0][0] if len(data_dirs) > 0 else 0
                 import_dir_rva = data_dirs[1][0] if len(data_dirs) > 1 else 0
@@ -340,6 +323,7 @@ class PEClassifier:
                     base_result["packer_sections"].append(name_str)
 
             base_result["sections"] = sections
+            base_result["has_packer_sections"] = bool(base_result["packer_sections"])
 
             # Helper function for RVA to raw file offset translation
             def rva_to_offset(rva: int) -> Optional[int]:
@@ -358,12 +342,13 @@ class PEClassifier:
             if import_dir_rva > 0:
                 imp_off = rva_to_offset(import_dir_rva)
                 if imp_off and imp_off + 20 <= len(raw_bytes):
-                    imports_dict, suspicious_apis, categories = self._parse_imports(
+                    imports_dict, suspicious_apis, categories, cat_map = self._parse_imports(
                         raw_bytes, imp_off, rva_to_offset, base_result["is_pe64"]
                     )
                     base_result["imports"] = imports_dict
                     base_result["suspicious_apis"] = suspicious_apis
                     base_result["suspicious_categories"] = list(categories)
+                    base_result["suspicious_apis_by_category"] = cat_map
 
             # 7. Check for Overlay
             if max_raw_end > 0 and len(raw_bytes) > max_raw_end + 512:
@@ -371,12 +356,13 @@ class PEClassifier:
                 base_result["overlay"]["present"] = True
                 base_result["overlay"]["size"] = len(overlay_data)
                 base_result["overlay"]["entropy"] = calculate_entropy(overlay_data)
+                base_result["has_overlay"] = True
 
             # 8. Compute Risk Score & Classification
             self._evaluate_pe_risk(base_result)
 
-            # Persist record in database if configured
-            if self.history_db and hasattr(self.history_db, "record_pe_analysis"):
+            # Persist record in database if configured and file_path provided
+            if self.history_db and file_path and hasattr(self.history_db, "record_pe_analysis"):
                 try:
                     self.history_db.record_pe_analysis(
                         file_path=base_result["file_path"],
@@ -395,11 +381,85 @@ class PEClassifier:
             return base_result
 
         except Exception as ex:
-            logger.error(f"Error analyzing PE file {file_path}: {ex}", exc_info=True)
+            logger.error(f"Error analyzing PE data: {ex}", exc_info=True)
             base_result["error"] = f"Internal parsing error: {str(ex)}"
             base_result["classification"] = "SUSPICIOUS"
             base_result["risk_score"] = 50
             base_result["reasons"].append(f"Parsing exception encountered: {str(ex)}")
+            return base_result
+
+    def analyze_file(self, file_path: Path) -> Dict[str, Any]:
+        """
+        Analyze a local file statically.
+        Returns a rich structural dictionary with headers, mitigations, sections,
+        imports, overlay, risk score, and explainable classification.
+        """
+        path_obj = Path(file_path)
+        base_result = {
+            "file_path": str(path_obj),
+            "file_name": path_obj.name,
+            "file_size": 0,
+            "sha256": "",
+            "is_pe": False,
+            "format": "NON_PE",
+            "is_pe64": False,
+            "machine": "UNKNOWN",
+            "compile_time": 0,
+            "subsystem": "UNKNOWN",
+            "mitigations": {
+                "dep": False,
+                "aslr": False,
+                "high_entropy_aslr": False,
+                "cfg": False,
+                "force_integrity": False,
+            },
+            "authenticode_present": False,
+            "sections": [],
+            "sections_count": 0,
+            "rwx_sections": [],
+            "high_entropy_sections": [],
+            "packer_sections": [],
+            "has_packer_sections": False,
+            "imports": {},
+            "suspicious_apis": [],
+            "suspicious_categories": [],
+            "suspicious_apis_by_category": {},
+            "exports_count": 0,
+            "overlay": {
+                "present": False,
+                "size": 0,
+                "entropy": 0.0,
+            },
+            "overall_entropy": 0.0,
+            "risk_score": 0,
+            "suspicion_score": 0,
+            "confidence": 0.5,
+            "classification": "NOT_A_PE",
+            "verdict": "NOT_A_PE",
+            "architecture": "UNKNOWN",
+            "suspicious_imports_found": [],
+            "has_authenticode": False,
+            "has_overlay": False,
+            "reasons": [],
+            "error": None,
+        }
+
+        if not path_obj.exists() or not path_obj.is_file():
+            base_result["error"] = "File does not exist or is not a regular file."
+            return base_result
+
+        # Protect against unbounded memory consumption on oversized files (> 150MB)
+        try:
+            st_size = path_obj.stat().st_size
+            if st_size > 150 * 1024 * 1024:
+                base_result["error"] = f"File exceeds maximum analysis size (150MB): {st_size} bytes."
+                base_result["verdict"] = "SKIPPED_OVERSIZED"
+                base_result["classification"] = "SKIPPED_OVERSIZED"
+                return base_result
+            raw_bytes = path_obj.read_bytes()
+            return self.analyze_bytes(raw_bytes, file_name=path_obj.name, file_path=str(path_obj))
+        except Exception as e:
+            base_result["error"] = f"Failed inspecting file: {e}"
             return base_result
 
     def _parse_imports(
@@ -408,11 +468,12 @@ class PEClassifier:
         import_desc_offset: int,
         rva_to_offset: Any,
         is_pe64: bool,
-    ) -> Tuple[Dict[str, List[str]], List[str], set]:
+    ) -> Tuple[Dict[str, List[str]], List[str], set, Dict[str, List[str]]]:
         """Parse Import Directory Table descriptors and extract imported functions."""
         imports = {}
         suspicious_apis = []
         categories = set()
+        cat_map: Dict[str, List[str]] = {cat: [] for cat in SUSPICIOUS_API_CATEGORIES}
         curr_desc = import_desc_offset
 
         # Bounded loop: inspect up to 50 imported DLL descriptors
@@ -473,10 +534,11 @@ class PEClassifier:
                                 if fn_lower in api_set:
                                     suspicious_apis.append(f"{fn_name} ({cat})")
                                     categories.add(cat)
+                                    cat_map[cat].append(fn_name)
 
             imports[dll_name] = func_names
 
-        return imports, suspicious_apis, categories
+        return imports, suspicious_apis, categories, cat_map
 
     def _evaluate_pe_risk(self, result: Dict[str, Any]) -> None:
         """Evaluate explainable risk score and assign classification."""

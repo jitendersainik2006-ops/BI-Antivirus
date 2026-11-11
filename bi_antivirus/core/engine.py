@@ -50,6 +50,12 @@ from bi_antivirus.monitors.patch_auditor import SoftwarePatchAuditor
 from bi_antivirus.core.threat_intel import ThreatIntelEngine
 from bi_antivirus.enterprise.fleet_manager import FleetManager
 from bi_antivirus.enterprise.compliance_reporter import ComplianceReporter
+from bi_antivirus.core.ml_engine import LocalMLEngine
+from bi_antivirus.monitors.process_guard import ProcessGuard
+from bi_antivirus.core.edr_engine import EDREngine
+from bi_antivirus.enterprise.cloud_sandbox import CloudSandboxClient
+from bi_antivirus.enterprise.rbac_manager import RBACManager
+from bi_antivirus.enterprise.siem_exporter import SIEMExporter
 
 
 class AntivirusEngine:
@@ -162,6 +168,24 @@ class AntivirusEngine:
         # 25. Enterprise Fleet Management & Compliance Reporting
         self.fleet_manager = FleetManager()
         self.compliance_reporter = ComplianceReporter(fleet_manager=self.fleet_manager, history_db=self.history_db)
+
+        # 26. Local ML Static PE Classification Engine
+        self.ml_engine = LocalMLEngine()
+
+        # 27. Process Protection Guard & Privilege Sentinel
+        self.process_guard = ProcessGuard(history_db=self.history_db)
+
+        # 28. Advanced Enterprise EDR Telemetry & Correlation Engine
+        self.edr_engine = EDREngine(history_db=self.history_db)
+
+        # 29. Cloud Sandbox Abstraction & Local Detonation Provider
+        self.cloud_sandbox = CloudSandboxClient()
+
+        # 30. Role-Based Access Control (RBAC) & Session Manager
+        self.rbac_manager = RBACManager()
+
+        # 31. SIEM Exporter & Cryptographic Hash Chaining Sentinel
+        self.siem_exporter = SIEMExporter()
 
         # Live Status
         self.system_status = "PROTECTED"

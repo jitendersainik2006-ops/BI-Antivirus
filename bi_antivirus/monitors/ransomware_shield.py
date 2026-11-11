@@ -45,6 +45,20 @@ RANSOM_NOTE_NAMES = {
 # Canary decoy file content header
 CANARY_HEADER = b"BI_ANTIVIRUS_CANARY_INTEGRITY_TRAP_V1_DO_NOT_MODIFY"
 
+# Known legitimate archiving, backup, and compiler tools that legitimately generate high-entropy output
+WHITELISTED_ARCHIVE_PROCESSES = {
+    "7z.exe", "7zfm.exe", "7zg.exe", "winrar.exe", "rar.exe", "tar.exe",
+    "gzip.exe", "bzip2.exe", "xz.exe", "git.exe", "cl.exe", "gcc.exe",
+    "g++.exe", "cargo.exe", "rustc.exe", "python.exe", "python3.exe",
+    "node.exe", "code.exe", "devenv.exe", "msbuild.exe", "compact.exe"
+}
+
+# Recognized compressed/archived file extensions where high entropy is expected and benign
+LEGITIMATE_COMPRESSED_EXTENSIONS = {
+    ".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst",
+    ".pak", ".jar", ".apk", ".iso", ".vmdk", ".whl", ".cab", ".lz4"
+}
+
 # Actionable Administrator Recovery Guidance
 RECOVERY_GUIDANCE = (
     "1. Host Isolation: Immediately isolate host from network to prevent lateral propagation.\n"
@@ -100,6 +114,21 @@ class RansomwareShield:
 
         # File entropy baseline tracking: {file_path_str: baseline_entropy}
         self._file_entropy_baseline: Dict[str, float] = {}
+
+        # Whitelisted processes for false positive suppression
+        self.whitelisted_processes: Set[str] = set(WHITELISTED_ARCHIVE_PROCESSES)
+
+    def whitelist_process(self, process_name: str) -> None:
+        """Add a process name to the archiver/compiler whitelist."""
+        if process_name:
+            self.whitelisted_processes.add(process_name.lower().strip())
+
+    def is_process_whitelisted(self, process_name: Optional[str]) -> bool:
+        """Check if a process is trusted for archiving or compiling."""
+        if not process_name:
+            return False
+        clean = Path(process_name).name.lower().strip()
+        return clean in self.whitelisted_processes
 
     def deploy_canaries(self) -> int:
         """Deploy honey-pot canary decoy files across watched directories."""
@@ -173,11 +202,28 @@ class RansomwareShield:
 
         return violations
 
-    def record_file_entropy(self, file_path: Path, data: Optional[bytes] = None) -> Optional[Dict[str, Any]]:
+    def record_file_entropy(
+        self,
+        file_path: Path,
+        data: Optional[bytes] = None,
+        process_name: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         Calculates and tracks file entropy. Detects transition from structured plaintext
         to encrypted ciphertext (entropy spike >= 7.2 with delta >= 2.0, or absolute entropy >= 7.5 on text/docs).
+        Suppresses false positives when writes originate from whitelisted archivers/compilers
+        or target legitimate compressed/archive file extensions.
         """
+        # 1. Check process whitelist
+        if self.is_process_whitelisted(process_name):
+            logger.debug(f"Entropy check suppressed for whitelisted process {process_name} on {file_path}")
+            return None
+
+        # 2. Check compressed extension whitelist
+        ext = file_path.suffix.lower()
+        if ext in LEGITIMATE_COMPRESSED_EXTENSIONS:
+            return None
+
         path_str = str(file_path).lower()
         if data is None:
             if not file_path.exists() or file_path.is_dir():
@@ -238,7 +284,7 @@ class RansomwareShield:
 
         return None
 
-    def record_file_mutation(self, file_path: Path) -> Optional[Dict[str, Any]]:
+    def record_file_mutation(self, file_path: Path, process_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Evaluate single file modification or creation for ransomware characteristics:
         1. Known ransomware extension (.locked, .crypto, etc.)
@@ -252,7 +298,7 @@ class RansomwareShield:
 
         # Check entropy transition if file exists
         if file_path.exists():
-            entropy_alert = self.record_file_entropy(file_path)
+            entropy_alert = self.record_file_entropy(file_path, process_name=process_name)
             if entropy_alert:
                 return entropy_alert
 
@@ -462,6 +508,7 @@ class RansomwareShield:
             "canaries": [str(p) for p in self.canaries.keys()],
             "mutations_tracked": len(self._mutation_history),
             "entropy_baselines_tracked": len(self._file_entropy_baseline),
+            "whitelisted_processes_count": len(self.whitelisted_processes),
             "burst_alerts": 0,
             "watch_dirs": [str(d) for d in self.watch_dirs],
         }

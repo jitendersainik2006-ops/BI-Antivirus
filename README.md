@@ -4,7 +4,7 @@
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-1.1.0--PRO-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-169%2F169%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-205%2F205%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -63,11 +63,17 @@ The primary architectural mandate is **strict non-destructive security and local
 | **Policy Distribution & Approved Rollback** | Cryptographically signed bundles with monotonic sequence verification ($v_{\text{new}} > v_{\text{current}}$), cryptographic receipts, and emergency administrator-approved rollback override tokens. | **VERIFIED (Approved Rollback Override)** |
 | **Hyper-V Sandbox Proof of Concept** | Disposable isolated VM architecture (Internal Virtual Switch only, zero host folder sharing, RAM $\le 2048$MB, vCPU $\le 2$, timeout $\le 60$s, snapshot revert), harmless synthetic sample execution, and dual-mode simulation. | **VERIFIED (Isolated Sandbox POC)** |
 | **Enterprise Fleet GUI Center** | 5-tab control center in `dashboard.py` (`🏢  Enterprise Fleet`) featuring live endpoints directory, mTLS certificate health, policy rollout & rollback dialogs, EDR incidents, compliance exports, and Hyper-V sandbox management. | **VERIFIED (Interactive 5-Tab GUI)** |
+| **Local Machine Learning Engine** | 12-dimensional numerical feature extraction from static PE structures, calibrated logistic inference, explainable factors, HMAC-SHA256 model signing, monotonic version gating, and emergency rollback to baseline v1. | **VERIFIED (8/8 Tests Pass)** |
+| **Process Guard & Privilege Sentinel** | Audits active Win32 process token privileges (`SeDebugPrivilege`, `SeTcbPrivilege`), detects Parent Process ID (PPID) spoofing and creation time inversion, and flags memory handle theft targeting `lsass.exe`. | **VERIFIED (7/7 Tests Pass)** |
+| **Advanced EDR & Telemetry Engine** | Normalized telemetry schema across process, file, registry, network, and memory events; full MITRE ATT&CK 14-tactic catalog (`TA0001` - `TA0043`); incident grouping; root-cause analysis (RCA); dynamic risk scoring (0-100). | **VERIFIED (5/5 Tests Pass)** |
+| **Firewall Management Integration** | Active profile status inspection (Domain, Private, Public); reversible staged rule lifecycle (`stage_firewall_rule`); mandatory admin authorization gate; netsh rule application and rollback. | **VERIFIED (5/5 Tests Pass)** |
+| **Cloud Sandbox Abstraction** | Standardized enterprise contract (`submit_sample`, `poll_status`), truthful capability disclosure, and deterministic local simulation provider with synthetic behavioral IOC generation. | **VERIFIED (3/3 Tests Pass)** |
+| **Enterprise RBAC & SIEM Hash Chaining** | Multi-tier roles (`SUPER_ADMIN`, `SEC_OPS`, `AUDITOR`, `READ_ONLY`) with permission matrices, session token management, CEF / RFC 5424 Syslog / JSON exporters, and cryptographic hash chaining ($H_i = \text{SHA256}(H_{i-1} \parallel \text{entry}_i)$). | **VERIFIED (8/8 Tests Pass)** |
 
 ### Planned Future Features (Roadmap)
 - **Kernel Mini-Filter Driver**: Transitioning filesystem interception from user-space polling to a certified Windows Kernel Mini-Filter Driver for instantaneous I/O pre-execution blocking.
 - **Decentralized Threat Intelligence**: Optional peer-to-peer threat definition sharing between localized BI Antivirus nodes.
-- **Embedded Machine Learning Classifier**: Sub-millisecond static classification using an embedded local ONNX machine-learning model without cloud inference.
+- **Embedded Deep Learning Classifier**: Sub-millisecond static classification using an embedded local ONNX neural network without cloud inference.
 
 ---
 
