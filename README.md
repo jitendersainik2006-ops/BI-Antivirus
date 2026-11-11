@@ -4,7 +4,7 @@
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-1.1.0--PRO-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-70%2F70%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-86%2F86%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -28,7 +28,11 @@ The primary architectural mandate is **strict non-destructive security and local
 
 | Subsystem | Capabilities & Mechanisms | Verification State |
 | :--- | :--- | :---: |
-| **Multi-Layer Detection Engine** | Streaming SHA-256/MD5 hashing in 64 KB memory-safe blocks; SQLite signature catalog with $O(1)$ indexed lookup; in-memory EICAR standard recognition; zero-byte false-positive suppression. | **VERIFIED (70/70 Tests Pass)** |
+| **Multi-Layer Detection Engine** | Streaming SHA-256/MD5 hashing in 64 KB memory-safe blocks; SQLite signature catalog with $O(1)$ indexed lookup; in-memory EICAR standard recognition; zero-byte false-positive suppression. | **VERIFIED (86/86 Tests Pass)** |
+| **Centralized Enterprise Policy Engine** | Canonical JSON serialization authenticated with HMAC-SHA256 signatures via Windows DPAPI machine keys; anti-rollback monotonic sequence tracking; dynamic thread-safe reload. | **VERIFIED (DPAPI Authenticated)** |
+| **Enterprise Device Control** | Granular USB/removable media enforcement (ALLOW, READ_ONLY, BLOCK) with whitelist/blacklist by serial; native Windows `StorageDevicePolicies` registry write-protect & `FSCTL_DISMOUNT_VOLUME` dismount. | **VERIFIED (OS Enforced)** |
+| **Enterprise Application Control** | Cryptographic SHA-256 binary hash whitelisting/blacklisting, untrusted directory execution lockdown (`%TEMP%`, `%APPDATA%`), Authenticode publisher rules, and active Win32 `TerminateProcess` enforcement. | **VERIFIED (Audit & Enforce Modes)** |
+| **Full Disk Encryption Sentinel** | Audits Windows BitLocker volume encryption status across fixed and OS drives; verifies cipher algorithms (`XTS-AES 128/256`), TPM/recovery protectors, and scrubbed key safety. | **VERIFIED (BitLocker Posture Audit)** |
 | **Heuristic & Anti-Evasion Analysis** | Shannon byte entropy analysis ($H > 7.2$ flags packed executables); double extension interceptor (e.g., `doc.pdf.exe`); PE packer section analysis (`.upx0`, `.aspack`, `.themida`); process injection import detection. | **VERIFIED (Tests Pass)** |
 | **Native Authenticode Verifier** | Native Windows `wintrust.dll` integration (`WinVerifyTrust` / `WINTRUST_ACTION_GENERIC_VERIFY_V2`) via `ctypes` validating digital signatures without third-party dependencies. | **VERIFIED (Native WinTrust API)** |
 | **Behavioral Process Sentinel** | Native `CreateToolhelp32Snapshot` combined with `NtQueryInformationProcess(60)` for live command-line visibility; flags anomalous parent-child chains (Word -> Shell), LOLBin exploitation, and ransomware staging. | **VERIFIED (Live CLI Extraction)** |

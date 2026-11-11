@@ -31,6 +31,9 @@ data/*.db
 data/n8n/
 data/n8n/**
 data/settings.json
+data/enterprise_policy.*
+data/backups/
+data/crypto_test_scratch/
 data/binaryData/
 
 # 4. Reversible Encrypted Quarantine Vault (.biq)

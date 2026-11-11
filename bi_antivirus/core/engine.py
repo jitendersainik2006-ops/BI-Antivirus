@@ -39,6 +39,10 @@ from bi_antivirus.monitors.firewall_monitor import FirewallMonitor
 from bi_antivirus.monitors.voice_alert import voice_service, VoiceAlertService
 from bi_antivirus.core.dispatcher import event_dispatcher, ThreatEventDispatcher
 from bi_antivirus.api.server import LocalAPIServer
+from bi_antivirus.core.policy_engine import PolicyEngine
+from bi_antivirus.monitors.device_control import DeviceControlSentinel
+from bi_antivirus.monitors.app_control import ApplicationControlSentinel
+from bi_antivirus.monitors.encryption_manager import DiskEncryptionSentinel
 
 
 class AntivirusEngine:
@@ -107,6 +111,29 @@ class AntivirusEngine:
         # 15. Loopback-Only Local REST API Server
         self.api_server = LocalAPIServer(self)
 
+        # 16. Centralized Enterprise Policy Engine
+        self.policy_engine = PolicyEngine()
+
+        # 17. Enterprise Device Control Sentinel
+        self.device_control = DeviceControlSentinel(
+            policy_engine=self.policy_engine,
+            history_db=self.history_db,
+            on_device_event=self._on_device_control_event,
+        )
+
+        # 18. Enterprise Application Control Sentinel
+        self.app_control = ApplicationControlSentinel(
+            policy_engine=self.policy_engine,
+            history_db=self.history_db,
+            on_violation=self._on_app_control_violation,
+        )
+
+        # 19. Full Disk Encryption (BitLocker) Sentinel
+        self.encryption_sentinel = DiskEncryptionSentinel(
+            history_db=self.history_db,
+            on_compliance_alert=self._on_encryption_alert,
+        )
+
         # Live Status
         self.system_status = "PROTECTED"
         self.active_scan_thread: Optional[threading.Thread] = None
@@ -137,6 +164,14 @@ class AntivirusEngine:
         self.usb_sentinel.start()
         self.sec_logger.log_event("INFO", "USB_SENTINEL", "USB Removable Media Sentinel started.")
 
+        # Start Enterprise Device Control Sentinel
+        self.device_control.start()
+        self.sec_logger.log_event("INFO", "DEVICE_CONTROL", "Enterprise Device Control Sentinel started.")
+
+        # Start Full Disk Encryption Sentinel
+        self.encryption_sentinel.start()
+        self.sec_logger.log_event("INFO", "ENCRYPTION_SENTINEL", "Full Disk Encryption Sentinel started.")
+
         # Start Automated Scheduler
         self.scheduler.start()
         self.sec_logger.log_event("INFO", "SCHEDULER", "Scan Scheduler started.")
@@ -158,6 +193,8 @@ class AntivirusEngine:
         self.behavioral_monitor.stop()
         self.ransomware_shield.stop()
         self.usb_sentinel.stop()
+        self.device_control.stop()
+        self.encryption_sentinel.stop()
         self.scheduler.stop()
         if self.scanner.is_scanning:
             self.scanner.cancel_scan()
@@ -269,6 +306,62 @@ class AntivirusEngine:
             except Exception:
                 pass
         self._update_system_status()
+
+    def _on_device_control_event(self, event: Dict[str, Any]) -> None:
+        """Handle policy decision from Enterprise Device Control Sentinel."""
+        action = event.get("policy_action", "ALLOW")
+        if action == "BLOCK":
+            self.system_status = "THREAT_DETECTED"
+            threat_dict = {
+                "file_path": f"Device:{event.get('drive_path')}",
+                "threat_name": "DeviceControl.BlockedStorageAttached",
+                "severity": "CRITICAL",
+                "file_hash": event.get("serial_number", "DEVICE_BLOCKED"),
+                "description": f"Blocked unauthorized removable storage (Serial: {event.get('serial_number')}): {event.get('reason')}",
+            }
+            self.sec_logger.log_event("ALERT", "DEVICE_CONTROL", f"Blocked device: {event.get('drive_path')}", details=event)
+            self.dispatcher.emit_threat_event(threat_dict, scan_id="DEVICE_CONTROL")
+            if self.on_threat_found:
+                try:
+                    self.on_threat_found(threat_dict)
+                except Exception:
+                    pass
+            self._update_system_status()
+        elif action == "READ_ONLY":
+            self.sec_logger.log_event("WARNING", "DEVICE_CONTROL", f"Device restricted to Read-Only: {event.get('drive_path')}", details=event)
+        else:
+            self.sec_logger.log_event("INFO", "DEVICE_CONTROL", f"Device authorized: {event.get('drive_path')}", details=event)
+
+    def _on_app_control_violation(self, violation: Dict[str, Any]) -> None:
+        """Handle violation from Enterprise Application Control Sentinel."""
+        status = violation.get("status", "AUDIT")
+        severity = "CRITICAL" if status == "BLOCK" else "HIGH"
+        if status == "BLOCK":
+            self.system_status = "THREAT_DETECTED"
+        threat_dict = {
+            "file_path": violation.get("file_path", "UNKNOWN_APPLICATION"),
+            "threat_name": f"AppControl.{status}.Violation",
+            "severity": severity,
+            "file_hash": violation.get("sha256", "APP_CONTROL_HASH"),
+            "description": f"Application Control policy triggered on {violation.get('file_name')}: {violation.get('reason')}",
+        }
+        self.sec_logger.log_event("ALERT", "APP_CONTROL", f"Application policy violation: {violation.get('file_name')} [{status}]", details=violation)
+        self.dispatcher.emit_threat_event(threat_dict, scan_id="APPLICATION_CONTROL")
+        if self.on_threat_found and status == "BLOCK":
+            try:
+                self.on_threat_found(threat_dict)
+            except Exception:
+                pass
+        self._update_system_status()
+
+    def _on_encryption_alert(self, alert_data: Dict[str, Any]) -> None:
+        """Handle non-compliance warning from Disk Encryption Sentinel."""
+        self.sec_logger.log_event(
+            "WARNING",
+            "DISK_ENCRYPTION",
+            f"Drive encryption alert: {alert_data.get('details')}",
+            details=alert_data,
+        )
 
     def _on_scheduled_scan_trigger(self, scan_type: str) -> None:
         """Triggered when scheduler activates a recurring scan."""

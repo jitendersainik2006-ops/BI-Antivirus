@@ -165,3 +165,32 @@ class HistoryDatabase:
                 "threats_quarantined": quarantined_count,
                 "last_scan_time": last_scan_time,
             }
+
+    def record_event(
+        self,
+        event_type: str,
+        source: str,
+        severity: str,
+        details: str = "",
+    ) -> int:
+        """Record a general security event (e.g. Device Control, App Control, Baseline Alert)."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO security_events (event_type, severity, source, message)
+                VALUES (?, ?, ?, ?)
+            """, (event_type, severity, source, details))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_security_events(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve recent security audit events."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, event_type, severity, source, message, timestamp
+                FROM security_events
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
