@@ -1,25 +1,25 @@
 {
-  "timestamp": "2026-11-11 22:06:55",
+  "timestamp": "2026-11-11 22:41:41",
   "hashing": {
     "test": "hashing_throughput",
     "file_size_mb": 30,
-    "elapsed_seconds": 0.1013,
-    "throughput_mb_s": 296.17,
+    "elapsed_seconds": 0.0936,
+    "throughput_mb_s": 320.6,
     "sha256_sample": "f70523088c8cf513..."
   },
   "pattern_matching": {
     "test": "pattern_matching_throughput",
     "iterations": 2500,
-    "elapsed_seconds": 0.0295,
-    "evaluations_per_second": 84628.7
+    "elapsed_seconds": 0.0193,
+    "evaluations_per_second": 129250.4
   },
   "database": {
     "test": "database_iops",
     "records": 400,
-    "write_elapsed_seconds": 5.6642,
-    "write_iops": 70.6,
-    "query_elapsed_seconds": 0.0186,
-    "query_iops": 21517.1,
+    "write_elapsed_seconds": 5.0018,
+    "write_iops": 80.0,
+    "query_elapsed_seconds": 0.0137,
+    "query_iops": 29110.8,
     "integrity_verified": true
   }
 }
