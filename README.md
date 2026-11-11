@@ -4,7 +4,7 @@
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-1.1.0--PRO-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-99%2F99%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-117%2F117%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -45,6 +45,10 @@ The primary architectural mandate is **strict non-destructive security and local
 | **Firewall & Network Auditor** | Read-only registry inspection of active Windows Defender Firewall profiles (Domain, Private, Public); active TCP/UDP socket auditor flagging connections to suspicious malware ports. | **VERIFIED (Passively Audited)** |
 | **Defensive Memory Exploit Shield** | Non-invasive, read-only auditing of process DEP, ASLR, CFG, Dynamic Code, and Binary Signature mitigations; bounded `VirtualQueryEx` sweep flagging RWX (`PAGE_EXECUTE_READWRITE`) and unbacked executable private pages; JIT runtime recognition; graceful OS-protected access-denied handling. | **VERIFIED (Win32 Mitigation & RWX Audit)** |
 | **Enterprise EDR Incident Graph Engine** | Cross-vector telemetry correlation linking process hierarchy (`SPAWNED`), files (`QUARANTINED`), network sockets (`CONNECTED_TO`), USB media (`MOUNTED`), and memory anomalies (`INJECTED_INTO`); evidence-backed MITRE ATT&CK mapping (`T1059.001`, `T1059.003`, `T1055`, `T1486`, `T1091`, `T1218`, `T1071.001`, `T1490`); SOC Markdown forensic reports and canonical SIEM JSON export. | **VERIFIED (MITRE ATT&CK Mapped)** |
+| **Local PE Static Feature Classifier** | Native struct unpacking of DOS, COFF, OptionalHeader (PE32/PE32+), and Section Tables; RWX dangerous permission detection; Shannon entropy calculations ($H \ge 7.0$); IAT suspicious API scanning (injection, evasion, C2, ransomware); compiler mitigations audit (DEP, ASLR, CFG); deterministic explainable scoring. | **VERIFIED (117/117 Tests Pass)** |
+| **Software Inventory & Patch Auditor** | Read-only registry application enumeration across 64-bit, WOW64 32-bit, and HKCU hives; semantic versioning comparisons against local verifiable CVE advisories (7-Zip, WinRAR, Chrome, Git, Zoom, Notepad++, VLC, Python); actionable manual remediation playbooks with zero silent modifications. | **VERIFIED (Registry + CVE Catalog)** |
+| **Threat Intelligence Update Engine** | Signed threat feed bundles using HMAC-SHA256 authenticated via Windows DPAPI machine keys; anti-rollback monotonic sequence checking; replay attack rejection; atomic SQLite database application; offline `.biu` package import without telemetry leakage. | **VERIFIED (DPAPI HMAC Signed)** |
+| **Ransomware Entropy Transition Tracking** | Monitors file modifications for transitions from structured low-entropy plaintext ($H < 5.0$) to high-entropy ciphertext ($H \ge 7.2$, $\Delta H \ge 2.0$); built-in safe self-cleaning simulation test harness in scratch space; actionable recovery guidance. | **VERIFIED (Entropy Burst Monitored)** |
 | **Local REST API Server** | Lightweight, multi-threaded loopback API (`127.0.0.1:8765`) enforcing constant-time token authentication (`X-BI-API-Key`), 60 req/min rate limiting, and bounded JSON payloads. | **VERIFIED (Online & Healthy)** |
 | **n8n Automation Bridge** | Dedicated localhost daemon (`127.0.0.1:5678`) translating internal threat dispatcher telemetry into sanitized webhooks with `/healthz` probing. | **VERIFIED (Online & Healthy)** |
 | **Genuine n8n Community Engine** | Official n8n Community Edition v2.46.5 installed and running on `127.0.0.1:5679` (Web UI) with separated Task Broker on `127.0.0.1:5680`. | **VERIFIED (Online & Healthy)** |

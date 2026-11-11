@@ -45,6 +45,9 @@ from bi_antivirus.monitors.app_control import ApplicationControlSentinel
 from bi_antivirus.monitors.encryption_manager import DiskEncryptionSentinel
 from bi_antivirus.monitors.exploit_shield import MemoryExploitShield
 from bi_antivirus.core.incident_graph import IncidentGraphEngine
+from bi_antivirus.core.pe_classifier import PEClassifier
+from bi_antivirus.monitors.patch_auditor import SoftwarePatchAuditor
+from bi_antivirus.core.threat_intel import ThreatIntelEngine
 
 
 class AntivirusEngine:
@@ -144,6 +147,15 @@ class AntivirusEngine:
             history_db=self.history_db,
             on_exploit_threat=self._on_exploit_threat,
         )
+
+        # 22. Local PE Static Feature Classifier
+        self.pe_classifier = PEClassifier(history_db=self.history_db)
+
+        # 23. Software Inventory & Patch Auditor
+        self.patch_auditor = SoftwarePatchAuditor(history_db=self.history_db)
+
+        # 24. Threat Intelligence Update Engine
+        self.threat_intel = ThreatIntelEngine(history_db=self.history_db, sig_db=self.sig_db)
 
         # Live Status
         self.system_status = "PROTECTED"
@@ -683,4 +695,38 @@ class AntivirusEngine:
             )
             self._update_system_status()
         return ok, msg
+
+    def inspect_pe_file(self, file_path: Path) -> Dict[str, Any]:
+        """Runs explainable static feature inspection on a Portable Executable binary."""
+        report = self.pe_classifier.analyze_file(file_path)
+        self.sec_logger.log_event(
+            "INFO" if report.get("verdict") == "BENIGN_PROBABLE" else "WARNING",
+            "PE_CLASSIFIER",
+            f"PE inspection complete for {Path(file_path).name}: {report.get('verdict')} (Score: {report.get('suspicion_score')})",
+            details=report,
+        )
+        return report
+
+    def audit_software_patches(self) -> Dict[str, Any]:
+        """Discovers installed software and compares versions against local CVE advisories."""
+        report = self.patch_auditor.scan_and_audit()
+        self.sec_logger.log_event(
+            "WARNING" if report.get("vulnerable_count", 0) > 0 else "INFO",
+            "PATCH_AUDITOR",
+            f"Software patch audit complete: {report.get('total_installed', 0)} installed, {report.get('vulnerable_count', 0)} vulnerable",
+            details=report,
+        )
+        return report
+
+    def apply_threat_intel_bundle(self, bundle_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validates and applies signed threat intelligence updates."""
+        res = self.threat_intel.verify_and_apply_bundle(bundle_data)
+        self.sec_logger.log_event(
+            "INFO" if res.get("status") == "SUCCESS" else "ERROR",
+            "THREAT_INTEL",
+            f"Threat intel bundle update: {res.get('status')} - {res.get('message')}",
+            details=res,
+        )
+        return res
+
 

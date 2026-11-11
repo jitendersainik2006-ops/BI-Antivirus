@@ -98,6 +98,65 @@ class HistoryDatabase:
                     audited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS software_inventory (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    display_name TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    publisher TEXT,
+                    install_date TEXT,
+                    install_location TEXT,
+                    vulnerability_status TEXT DEFAULT 'UNKNOWN',
+                    matched_cve TEXT,
+                    audited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS cve_advisories (
+                    cve_id TEXT PRIMARY KEY,
+                    product_name TEXT NOT NULL,
+                    vendor TEXT,
+                    affected_versions_min TEXT,
+                    affected_versions_max TEXT,
+                    fixed_version TEXT,
+                    severity TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    published_date TEXT,
+                    verified INTEGER DEFAULT 1
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pe_analysis_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    file_path TEXT NOT NULL,
+                    file_hash TEXT,
+                    classification TEXT NOT NULL,
+                    risk_score INTEGER DEFAULT 0,
+                    confidence REAL DEFAULT 0.5,
+                    is_pe64 INTEGER DEFAULT 1,
+                    sections_count INTEGER DEFAULT 0,
+                    suspicious_imports_count INTEGER DEFAULT 0,
+                    findings_json TEXT,
+                    analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS threat_intel_manifest (
+                    feed_id TEXT PRIMARY KEY,
+                    version TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    signatures_count INTEGER DEFAULT 0,
+                    advisories_count INTEGER DEFAULT 0,
+                    publisher TEXT,
+                    signature_valid INTEGER DEFAULT 1,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     def record_scan_session(
@@ -364,4 +423,187 @@ class HistoryDatabase:
                     pass
                 results.append(item)
             return results
+
+    def record_software_inventory(self, apps: List[Dict[str, Any]]) -> None:
+        """Replace or update installed software inventory records."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # Clear previous audit snapshot
+            cursor.execute("DELETE FROM software_inventory")
+            for a in apps:
+                cursor.execute("""
+                    INSERT INTO software_inventory (
+                        display_name, version, publisher, install_date, install_location,
+                        vulnerability_status, matched_cve
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    a.get("display_name") or a.get("app_name", "Unknown"),
+                    a.get("version", "0.0.0"),
+                    a.get("publisher", "Unknown"),
+                    a.get("install_date", ""),
+                    a.get("install_location", ""),
+                    a.get("vulnerability_status") or a.get("status", "UNKNOWN"),
+                    a.get("matched_cve", ""),
+                ))
+            conn.commit()
+
+    def get_software_inventory(self, limit: int = 200, filter_status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieve installed software inventory, optionally filtered by status."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if filter_status:
+                cursor.execute("""
+                    SELECT id, display_name, version, publisher, install_date, install_location,
+                           vulnerability_status, matched_cve, audited_at
+                    FROM software_inventory
+                    WHERE vulnerability_status = ?
+                    ORDER BY display_name ASC
+                    LIMIT ?
+                """, (filter_status, limit))
+            else:
+                cursor.execute("""
+                    SELECT id, display_name, version, publisher, install_date, install_location,
+                           vulnerability_status, matched_cve, audited_at
+                    FROM software_inventory
+                    ORDER BY display_name ASC
+                    LIMIT ?
+                """, (limit,))
+            rows = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                d["app_name"] = d.get("display_name", "")
+                d["status"] = d.get("vulnerability_status", "")
+                rows.append(d)
+            return rows
+
+    def record_cve_advisory(
+        self,
+        cve_id: str,
+        product_name: str,
+        vendor: str,
+        affected_versions_min: str,
+        affected_versions_max: str,
+        fixed_version: str,
+        severity: str,
+        title: str,
+        description: str,
+        published_date: str = "",
+        verified: int = 1,
+    ) -> None:
+        """Record or update a local CVE vulnerability advisory."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO cve_advisories (
+                    cve_id, product_name, vendor, affected_versions_min, affected_versions_max,
+                    fixed_version, severity, title, description, published_date, verified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (cve_id, product_name, vendor, affected_versions_min, affected_versions_max,
+                  fixed_version, severity, title, description, published_date, verified))
+            conn.commit()
+
+    def get_cve_advisories(self, product_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieve local vulnerability advisories, optionally filtered by product name."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if product_name:
+                cursor.execute("""
+                    SELECT cve_id, product_name, vendor, affected_versions_min, affected_versions_max,
+                           fixed_version, severity, title, description, published_date, verified
+                    FROM cve_advisories
+                    WHERE product_name LIKE ?
+                    ORDER BY cve_id DESC
+                """, (f"%{product_name}%",))
+            else:
+                cursor.execute("""
+                    SELECT cve_id, product_name, vendor, affected_versions_min, affected_versions_max,
+                           fixed_version, severity, title, description, published_date, verified
+                    FROM cve_advisories
+                    ORDER BY cve_id DESC
+                """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def record_pe_analysis(
+        self,
+        file_path: str,
+        file_hash: str,
+        classification: str,
+        risk_score: int,
+        confidence: float,
+        is_pe64: int,
+        sections_count: int,
+        suspicious_imports_count: int,
+        findings: Any = "",
+    ) -> int:
+        """Record static PE security classification analysis result."""
+        findings_str = json.dumps(findings) if isinstance(findings, (list, dict)) else str(findings)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO pe_analysis_records (
+                    file_path, file_hash, classification, risk_score, confidence,
+                    is_pe64, sections_count, suspicious_imports_count, findings_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (file_path, file_hash, classification, risk_score, confidence,
+                  is_pe64, sections_count, suspicious_imports_count, findings_str))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_recent_pe_analyses(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve recent static PE inspection records."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, file_path, file_hash, classification, risk_score, confidence,
+                       is_pe64, sections_count, suspicious_imports_count, findings_json, analyzed_at
+                FROM pe_analysis_records
+                ORDER BY analyzed_at DESC
+                LIMIT ?
+            """, (limit,))
+            results = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                item["sha256"] = item.get("file_hash", "")
+                try:
+                    item["findings"] = json.loads(item["findings_json"]) if item.get("findings_json") else []
+                except Exception:
+                    item["findings"] = []
+                results.append(item)
+            return results
+
+    def record_threat_intel_update(
+        self,
+        feed_id: str,
+        version: str,
+        sequence: int,
+        signatures_count: int,
+        advisories_count: int,
+        publisher: str,
+        signature_valid: int = 1,
+    ) -> None:
+        """Record verified threat intelligence feed update."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO threat_intel_manifest (
+                    feed_id, version, sequence, signatures_count, advisories_count,
+                    publisher, signature_valid, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (feed_id, version, sequence, signatures_count, advisories_count, publisher, signature_valid))
+            conn.commit()
+
+    def get_threat_intel_status(self) -> Optional[Dict[str, Any]]:
+        """Retrieve most recent threat intelligence manifest status."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT feed_id, version, sequence, signatures_count, advisories_count,
+                       publisher, signature_valid, updated_at
+                FROM threat_intel_manifest
+                ORDER BY sequence DESC
+                LIMIT 1
+            """)
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
 

@@ -12,14 +12,16 @@ import time
 import hashlib
 import threading
 import logging
+import math
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable, Set, Tuple
-from collections import deque
+from collections import deque, Counter
 
 from bi_antivirus.config import (
     SEVERITY_CRITICAL,
     SEVERITY_HIGH,
     DATA_DIR,
+    SCRATCH_DIR,
     load_settings,
 )
 from bi_antivirus.database.history import HistoryDatabase
@@ -42,6 +44,30 @@ RANSOM_NOTE_NAMES = {
 
 # Canary decoy file content header
 CANARY_HEADER = b"BI_ANTIVIRUS_CANARY_INTEGRITY_TRAP_V1_DO_NOT_MODIFY"
+
+# Actionable Administrator Recovery Guidance
+RECOVERY_GUIDANCE = (
+    "1. Host Isolation: Immediately isolate host from network to prevent lateral propagation.\n"
+    "2. Process Termination: Terminate suspicious process trees executing rapid file mutations.\n"
+    "3. Canary Verification: Check canary decoy files in user directories.\n"
+    "4. Volume Shadow Assessment: Verify Volume Shadow Copies (vssadmin list shadows).\n"
+    "5. Encrypted Vault Restore: Restore clean original files from BI Antivirus Quarantine Vault."
+)
+
+
+def calculate_shannon_entropy(data: bytes) -> float:
+    """Calculate Shannon entropy in bits per byte (0.0 to 8.0)."""
+    if not data:
+        return 0.0
+    length = len(data)
+    counts = Counter(data)
+    entropy = 0.0
+    for count in counts.values():
+        p_x = count / length
+        if p_x > 0:
+            entropy -= p_x * math.log2(p_x)
+    return round(entropy, 4)
+
 
 
 class RansomwareShield:
@@ -71,6 +97,9 @@ class RansomwareShield:
         self._mutation_history: deque = deque(maxlen=200)
         self._burst_window_seconds = 5.0
         self._burst_threshold = 3  # >= 3 ransomware mutations in 5s triggers critical alert
+
+        # File entropy baseline tracking: {file_path_str: baseline_entropy}
+        self._file_entropy_baseline: Dict[str, float] = {}
 
     def deploy_canaries(self) -> int:
         """Deploy honey-pot canary decoy files across watched directories."""
@@ -144,16 +173,79 @@ class RansomwareShield:
 
         return violations
 
+    def record_file_entropy(self, file_path: Path, data: Optional[bytes] = None) -> Optional[Dict[str, Any]]:
+        """
+        Calculates and tracks file entropy. Detects transition from structured plaintext
+        to encrypted ciphertext (entropy spike >= 7.2 with delta >= 2.0, or absolute entropy >= 7.5 on text/docs).
+        """
+        path_str = str(file_path).lower()
+        if data is None:
+            if not file_path.exists() or file_path.is_dir():
+                return None
+            try:
+                with open(file_path, "rb") as f:
+                    data = f.read(65536)  # Sample first 64KB
+            except Exception:
+                return None
+
+        if len(data) < 128:
+            return None  # Too small for statistically significant entropy evaluation
+
+        entropy = calculate_shannon_entropy(data)
+        baseline = self._file_entropy_baseline.get(path_str)
+        self._file_entropy_baseline[path_str] = entropy
+
+        # Check for entropy transition indicating encryption
+        if baseline is not None and baseline < 5.5 and entropy >= 7.2:
+            delta = entropy - baseline
+            alert = {
+                "type": "RANSOMWARE_ENTROPY_SPIKE",
+                "file_path": str(file_path),
+                "severity": SEVERITY_CRITICAL,
+                "threat_name": "Ransomware.EntropySpike.CiphertextTransition",
+                "summary": f"Entropy spike detected in {file_path.name}: {baseline:.2f} -> {entropy:.2f} bits/byte (+{delta:.2f})",
+                "baseline_entropy": baseline,
+                "current_entropy": entropy,
+                "entropy_delta": round(delta, 4),
+                "recovery_guidance": RECOVERY_GUIDANCE,
+            }
+            self._handle_alert(alert)
+            return alert
+
+        # Also check for single-sample high entropy on standard non-compressed extensions
+        name_lower = file_path.name.lower()
+        if any(name_lower.endswith(sfx) for sfx in (".txt", ".log", ".csv", ".json", ".xml", ".sql")) and entropy >= 7.6:
+            alert = {
+                "type": "RANSOMWARE_HIGH_ENTROPY_TEXT",
+                "file_path": str(file_path),
+                "severity": SEVERITY_HIGH,
+                "threat_name": "Ransomware.SuspiciousHighEntropyDocument",
+                "summary": f"Abnormally high entropy ({entropy:.2f} bits/byte) in document {file_path.name}",
+                "current_entropy": entropy,
+                "recovery_guidance": RECOVERY_GUIDANCE,
+            }
+            self._handle_alert(alert)
+            return alert
+
+        return None
+
     def record_file_mutation(self, file_path: Path) -> Optional[Dict[str, Any]]:
         """
         Evaluate single file modification or creation for ransomware characteristics:
         1. Known ransomware extension (.locked, .crypto, etc.)
         2. Known ransom note dropped
         3. Mutation burst rate exceeding safety threshold
+        4. Entropy transition
         """
         now = time.time()
         ext = file_path.suffix.lower()
         name = file_path.name.lower()
+
+        # Check entropy transition if file exists
+        if file_path.exists():
+            entropy_alert = self.record_file_entropy(file_path)
+            if entropy_alert:
+                return entropy_alert
 
         # 1. Ransom Note Check
         if name in RANSOM_NOTE_NAMES:
@@ -163,6 +255,7 @@ class RansomwareShield:
                 "severity": SEVERITY_CRITICAL,
                 "threat_name": "Ransomware.ExtortionNote.Detected",
                 "summary": f"Known ransomware extortion note detected: {file_path.name}",
+                "recovery_guidance": RECOVERY_GUIDANCE,
             }
             self._handle_alert(alert)
             return alert
@@ -181,6 +274,7 @@ class RansomwareShield:
                     "threat_name": "Ransomware.ActiveEncryptionBurst",
                     "summary": f"Detected high-frequency ransomware encryption burst ({len(recent)} files mutated to {ext} within {self._burst_window_seconds}s)!",
                     "mutated_count": len(recent),
+                    "recovery_guidance": RECOVERY_GUIDANCE,
                 }
                 self._handle_alert(alert)
                 return alert
@@ -191,6 +285,7 @@ class RansomwareShield:
                     "severity": SEVERITY_HIGH,
                     "threat_name": f"Ransomware.SuspiciousExtension{ext.upper()}",
                     "summary": f"File renamed or written with known ransomware extension: {ext}",
+                    "recovery_guidance": RECOVERY_GUIDANCE,
                 }
                 self._handle_alert(alert)
                 return alert
@@ -263,6 +358,93 @@ class RansomwareShield:
             # Check every 2 seconds
             self._stop_event.wait(2.0)
 
+    def simulate_ransomware_scenario(self, scratch_dir: Optional[Path] = None) -> Dict[str, Any]:
+        """
+        Controlled harmless ransomware test harness.
+        Creates benign plaintext files in D: drive scratch space, mutates them to high-entropy ciphertext,
+        and verifies interception by RansomwareShield. Cleans up all simulation files.
+        """
+        import secrets
+        target_dir = scratch_dir or (SCRATCH_DIR / "sim_ransomware")
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        sim_files: List[Path] = []
+        mutated_paths: List[Path] = []
+        alerts_caught: List[Dict[str, Any]] = []
+        original_callback = self.on_ransomware_alert
+
+        def _capture_alert(alert: Dict[str, Any]) -> None:
+            alerts_caught.append(alert)
+            if original_callback:
+                try:
+                    original_callback(alert)
+                except Exception:
+                    pass
+
+        self.on_ransomware_alert = _capture_alert
+
+        try:
+            # 1. Create benign plaintext sample files with low entropy
+            sample_texts = [
+                b"Black Intel Cyber Defense Platform System Audit Log File. Normal corporate document. " * 30,
+                b"Financial report quarterly revenue table: Q1: $10000, Q2: $20000, Q3: $30000. " * 30,
+                b"Employee attendance roster and timesheet records. Normal operations active today. " * 30,
+                b"Configuration parameters for internal network gateways and subnet routes table. " * 30,
+            ]
+            baseline_entropies = []
+            for i, text in enumerate(sample_texts):
+                p = target_dir / f"test_document_{i}.txt"
+                p.write_bytes(text)
+                sim_files.append(p)
+                # Baseline entropy check
+                self.record_file_entropy(p)
+                baseline_entropies.append(calculate_shannon_entropy(p.read_bytes()))
+
+            # 2. Simulate encryption burst: rewrite files with high-entropy pseudorandom bytes + .locked extension
+            for i, p in enumerate(sim_files):
+                high_entropy_bytes = secrets.token_bytes(2048)
+                locked_path = p.with_suffix(".txt.locked")
+                locked_path.write_bytes(high_entropy_bytes)
+                mutated_paths.append(locked_path)
+                p.unlink(missing_ok=True)
+
+                # Trigger monitors
+                self.record_file_entropy(locked_path)
+                self.record_file_mutation(locked_path)
+
+            # 3. Simulate ransom note drop
+            ransom_note = target_dir / "readme_to_decrypt.txt"
+            ransom_note.write_text("ALL YOUR FILES HAVE BEEN ENCRYPTED! Send 1 BTC to recover.")
+            mutated_paths.append(ransom_note)
+            self.record_file_mutation(ransom_note)
+
+            simulation_result = {
+                "status": "SUCCESS",
+                "files_simulated": len(sample_texts),
+                "baseline_mean_entropy": round(sum(baseline_entropies) / len(baseline_entropies), 2),
+                "alerts_intercepted": len(alerts_caught),
+                "alert_types": list({a.get("type") for a in alerts_caught}),
+                "burst_detected": any("BURST" in a.get("type", "") for a in alerts_caught),
+                "ransom_note_detected": any("NOTE" in a.get("type", "") for a in alerts_caught),
+                "entropy_spike_detected": any("ENTROPY" in a.get("type", "") for a in alerts_caught),
+                "containment_verified": len(alerts_caught) > 0,
+                "recovery_guidance": RECOVERY_GUIDANCE,
+            }
+            return simulation_result
+        finally:
+            self.on_ransomware_alert = original_callback
+            # Clean up all created simulation files safely
+            for f in mutated_paths + sim_files:
+                try:
+                    if f.exists():
+                        f.unlink()
+                except Exception:
+                    pass
+            try:
+                target_dir.rmdir()
+            except Exception:
+                pass
+
     def get_shield_status(self) -> Dict[str, Any]:
         """Return diagnostic status of the ransomware shield and canaries."""
         return {
@@ -270,6 +452,7 @@ class RansomwareShield:
             "canaries_count": len(self.canaries),
             "canaries": [str(p) for p in self.canaries.keys()],
             "mutations_tracked": len(self._mutation_history),
+            "entropy_baselines_tracked": len(self._file_entropy_baseline),
             "burst_alerts": 0,
             "watch_dirs": [str(d) for d in self.watch_dirs],
         }

@@ -13,10 +13,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from bi_antivirus.monitors.usb_sentinel import USBSentinel
 
+D_DRIVE_SCRATCH = Path(r"D:\bit defender\data\crypto_test_scratch")
+
 class TestUSBSentinel(unittest.TestCase):
 
     def setUp(self):
-        self.mock_drive = Path(tempfile.mkdtemp(prefix="bi_mock_usb_"))
+        D_DRIVE_SCRATCH.mkdir(parents=True, exist_ok=True)
+        self.mock_drive = Path(tempfile.mkdtemp(prefix="bi_mock_usb_", dir=str(D_DRIVE_SCRATCH)))
 
     def tearDown(self):
         if self.mock_drive.exists():

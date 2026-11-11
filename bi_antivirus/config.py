@@ -20,6 +20,7 @@ QUARANTINE_DIR = PROJECT_ROOT / "quarantine"
 QUARANTINE_VAULT_DIR = QUARANTINE_DIR / "vault"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 TEMPLATES_DIR = PROJECT_ROOT / "integrations" / "templates"
+SCRATCH_DIR = DATA_DIR / "crypto_test_scratch"
 CONFIG_FILE = DATA_DIR / "settings.json"
 
 # Database Paths
@@ -32,7 +33,7 @@ API_KEY_FILE = DATA_DIR / "api_key.txt"
 VAULT_KEY_PATH = DATA_DIR / "vault_master.dpapi"
 
 # Ensure all directories exist on D: drive
-for _directory in (DATA_DIR, LOGS_DIR, QUARANTINE_DIR, QUARANTINE_VAULT_DIR, REPORTS_DIR, TEMPLATES_DIR):
+for _directory in (DATA_DIR, LOGS_DIR, QUARANTINE_DIR, QUARANTINE_VAULT_DIR, REPORTS_DIR, TEMPLATES_DIR, SCRATCH_DIR):
     _directory.mkdir(parents=True, exist_ok=True)
 
 # Application Meta
@@ -77,6 +78,7 @@ THEME = {
     
     # Accent & Status
     "accent_primary": "#00d285",   # Clean Emerald - Bitdefender-style safe green
+    "accent_secondary": "#00b4d8", # Secondary Cyber Cyan
     "accent_cyan": "#00b4d8",      # Cyber cyan
     "accent_hover": "#00f59b",     # Glowing emerald
     
@@ -84,6 +86,7 @@ THEME = {
     "status_safe": "#00d285",      # Emerald Green
     "status_warning": "#ffb020",   # Warm Amber
     "status_threat": "#ff385c",    # Threat Crimson
+    "status_critical": "#ff385c",  # Critical Alert Crimson
     "status_info": "#00b4d8",      # Info Cyan
     
     # Typography

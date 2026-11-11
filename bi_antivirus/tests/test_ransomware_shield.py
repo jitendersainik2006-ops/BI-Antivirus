@@ -13,10 +13,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from bi_antivirus.monitors.ransomware_shield import RansomwareShield
 
+D_DRIVE_SCRATCH = Path(r"D:\bit defender\data\crypto_test_scratch")
+
 class TestRansomwareShield(unittest.TestCase):
 
     def setUp(self):
-        self.temp_dir = Path(tempfile.mkdtemp(prefix="bi_test_ransom_"))
+        D_DRIVE_SCRATCH.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = Path(tempfile.mkdtemp(prefix="bi_test_ransom_", dir=str(D_DRIVE_SCRATCH)))
         self.shield = RansomwareShield(watch_dirs=[self.temp_dir])
 
     def tearDown(self):

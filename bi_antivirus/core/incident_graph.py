@@ -62,9 +62,13 @@ class MitreTechnique:
     name: str
     tactic: str
     evidence: str
+    evidence_type: str = "OBSERVED_FACT"  # OBSERVED_FACT, SUSPICIOUS_INDICATOR, CONFIRMED_DETECTION
+    evidence_confidence: float = 1.0
+    source_reference: str = "SecurityCore"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
 
 
 class EDRIncident:
@@ -122,14 +126,31 @@ class EDRIncident:
         self.timeline.sort(key=lambda x: x["timestamp"])
         self.updated_at = time.time()
 
-    def add_mitre_technique(self, tech_id: str, name: str, tactic: str, evidence: str) -> None:
+    def add_mitre_technique(
+        self,
+        tech_id: str,
+        name: str,
+        tactic: str,
+        evidence: str,
+        evidence_type: str = "OBSERVED_FACT",
+        evidence_confidence: float = 1.0,
+        source_reference: str = "SecurityCore",
+    ) -> None:
         for existing in self.mitre_techniques:
             if existing.id == tech_id:
                 # Append additional evidence if not present
                 if evidence not in existing.evidence:
                     existing.evidence += f" | {evidence}"
                 return
-        self.mitre_techniques.append(MitreTechnique(id=tech_id, name=name, tactic=tactic, evidence=evidence))
+        self.mitre_techniques.append(MitreTechnique(
+            id=tech_id,
+            name=name,
+            tactic=tactic,
+            evidence=evidence,
+            evidence_type=evidence_type,
+            evidence_confidence=evidence_confidence,
+            source_reference=source_reference,
+        ))
         self.updated_at = time.time()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -311,14 +332,18 @@ class IncidentGraphEngine:
         cmd_lower = cmdline.lower()
 
         if "powershell" in name_lower:
+            is_obfuscated = any(flg in cmd_lower for flg in ("-enc", "-encodedcommand", "downloadstring", "iex", "-w hidden", "-nop"))
             evidence = f"PowerShell execution: {cmdline[:120]}"
-            if any(flg in cmd_lower for flg in ("-enc", "-encodedcommand", "downloadstring", "iex", "-w hidden", "-nop")):
+            if is_obfuscated:
                 evidence += " [Obfuscated / Encoded execution arguments detected]"
             incident.add_mitre_technique(
                 "T1059.001",
                 "Command and Scripting Interpreter: PowerShell",
                 "Execution",
                 evidence,
+                evidence_type="SUSPICIOUS_INDICATOR" if is_obfuscated else "OBSERVED_FACT",
+                evidence_confidence=0.85 if is_obfuscated else 0.60,
+                source_reference="Win32.ProcessCreation",
             )
 
         if name_lower in ("cmd.exe", "conhost.exe") and ("/c" in cmd_lower or "/k" in cmd_lower):
@@ -327,6 +352,9 @@ class IncidentGraphEngine:
                 "Command and Scripting Interpreter: Windows Command Shell",
                 "Execution",
                 f"Command prompt execution: {cmdline[:120]}",
+                evidence_type="OBSERVED_FACT",
+                evidence_confidence=0.70,
+                source_reference="Win32.ProcessCreation",
             )
 
         if name_lower in self.LOLBINS:
@@ -335,6 +363,9 @@ class IncidentGraphEngine:
                 "System Binary Proxy Execution (LOLBins)",
                 "Defense Evasion",
                 f"Execution of trusted LOLBin binary '{name}' with args: {cmdline[:120]}",
+                evidence_type="SUSPICIOUS_INDICATOR",
+                evidence_confidence=0.75,
+                source_reference="LOLBinSentinel",
             )
 
         if any(tool in cmd_lower for tool in ("vssadmin", "wmic shadowcopy", "bcdedit")):
@@ -344,6 +375,9 @@ class IncidentGraphEngine:
                     "Inhibit System Recovery",
                     "Impact",
                     f"Command attempting backup/shadow-copy deletion: {cmdline[:120]}",
+                    evidence_type="CONFIRMED_DETECTION",
+                    evidence_confidence=0.95,
+                    source_reference="ProcessCreation.CmdlineAnalyzer",
                 )
 
     def _handle_file_threat(self, incident: EDRIncident, event_type: str, data: Dict[str, Any]) -> None:
@@ -387,6 +421,9 @@ class IncidentGraphEngine:
                 "User Execution: Malicious File",
                 "Execution",
                 f"Standard validation payload detected in {file_name}",
+                evidence_type="CONFIRMED_DETECTION",
+                evidence_confidence=1.0,
+                source_reference="ThreatDetector.SignatureMatch",
             )
 
     def _handle_ransomware_alert(self, incident: EDRIncident, data: Dict[str, Any]) -> None:
@@ -405,6 +442,9 @@ class IncidentGraphEngine:
             "Data Encrypted for Impact",
             "Impact",
             f"Detected rapid mutation burst / extortion note matching ransomware signature ({ext or pattern})",
+            evidence_type="CONFIRMED_DETECTION",
+            evidence_confidence=0.90,
+            source_reference="RansomwareShield.EntropyBurst",
         )
 
     def _handle_network_event(self, incident: EDRIncident, data: Dict[str, Any]) -> None:
@@ -437,11 +477,15 @@ class IncidentGraphEngine:
         )
 
         if dest_port in (80, 443, 8080, 8443):
+            # Observable network fact: standard socket opening is an observed fact, not standalone proof of compromise
             incident.add_mitre_technique(
                 "T1071.001",
                 "Application Layer Protocol: Web Protocols",
                 "Command and Control",
-                f"Outbound web connection to external IP {dest_ip}:{dest_port}",
+                f"Outbound web connection to external IP {dest_ip}:{dest_port} (Observed network socket; non-conclusive alone without corroborating payload)",
+                evidence_type="OBSERVED_FACT",
+                evidence_confidence=0.60,
+                source_reference="FirewallMonitor.SocketQuery",
             )
 
     def _handle_usb_event(self, incident: EDRIncident, data: Dict[str, Any]) -> None:
@@ -468,6 +512,9 @@ class IncidentGraphEngine:
                 "Replication Through Removable Media",
                 "Lateral Movement / Initial Access",
                 f"Autorun.inf / LNK worm pattern detected on removable drive {drive}",
+                evidence_type="CONFIRMED_DETECTION",
+                evidence_confidence=0.95,
+                source_reference="USBSentinel",
             )
 
     def _handle_app_control(self, incident: EDRIncident, data: Dict[str, Any]) -> None:
@@ -496,6 +543,9 @@ class IncidentGraphEngine:
                 "User Execution: Malicious File",
                 "Execution",
                 f"Execution blocked by application control policy: {Path(file_path).name}",
+                evidence_type="CONFIRMED_DETECTION",
+                evidence_confidence=1.0,
+                source_reference="ApplicationControl",
             )
 
     def _handle_memory_exploit(self, incident: EDRIncident, data: Dict[str, Any]) -> None:
@@ -518,11 +568,15 @@ class IncidentGraphEngine:
         )
 
         if data.get("rwx_regions_count", 0) > 0 or data.get("unbacked_executable_count", 0) > 0:
+            # Memory indicator: RWX memory is an anomaly/suspicious indicator, requiring corroborating telemetry
             incident.add_mitre_technique(
                 "T1055",
                 "Process Injection",
                 "Defense Evasion / Privilege Escalation",
-                f"Detected {data.get('rwx_regions_count', 0)} RWX memory pages and {data.get('unbacked_executable_count', 0)} unbacked executable code regions in {proc_name}",
+                f"Detected {data.get('rwx_regions_count', 0)} RWX memory pages and {data.get('unbacked_executable_count', 0)} unbacked executable code regions in {proc_name} (Suspicious memory indicator; non-conclusive alone without payload corroboration)",
+                evidence_type="SUSPICIOUS_INDICATOR",
+                evidence_confidence=0.70,
+                source_reference="ExploitShield.VirtualQueryEx",
             )
 
     def _handle_generic_event(self, incident: EDRIncident, event_type: str, data: Dict[str, Any]) -> None:
@@ -612,11 +666,13 @@ class IncidentGraphEngine:
         ]
 
         if inc.mitre_techniques:
-            lines.append("| Technique ID | Technique Name | Tactic | Concrete Observable Evidence |")
-            lines.append("|---|---|---|---|")
+            lines.append("| Technique ID | Technique Name | Tactic | Evidence Classification | Confidence | Source Reference | Concrete Observable Evidence |")
+            lines.append("|---|---|---|---|---|---|---|")
             for t in inc.mitre_techniques:
                 clean_ev = t.evidence.replace("|", "/")
-                lines.append(f"| `{t.id}` | **{t.name}** | {t.tactic} | {clean_ev} |")
+                lines.append(
+                    f"| `{t.id}` | **{t.name}** | {t.tactic} | `{t.evidence_type}` | {int(t.evidence_confidence * 100)}% | `{t.source_reference}` | {clean_ev} |"
+                )
         else:
             lines.append("*(No specific MITRE ATT&CK matrix mappings matched for this baseline event)*")
 
