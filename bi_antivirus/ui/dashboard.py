@@ -19,6 +19,7 @@ from bi_antivirus.config import (
     PROJECT_ROOT,
 )
 from bi_antivirus.core.engine import AntivirusEngine
+from bi_antivirus.core.privilege_manager import is_user_admin
 from bi_antivirus.ui.theme import apply_theme
 from bi_antivirus.ui.views.overview_view import OverviewView
 from bi_antivirus.ui.views.scan_view import ScanView
@@ -144,6 +145,17 @@ class AntivirusDashboard(tk.Tk):
             anchor="w",
         )
         self.footer_status.pack(fill="x")
+
+        is_adm = is_user_admin()
+        self.footer_mode = tk.Label(
+            footer_frame,
+            text="🛡️ ADMIN: FULL" if is_adm else "⚠️ USER: AUDIT ONLY",
+            bg=THEME["bg_dark"],
+            fg=THEME["status_safe"] if is_adm else THEME["status_warning"],
+            font=(THEME["font_family"], 8, "bold"),
+            anchor="w",
+        )
+        self.footer_mode.pack(fill="x", pady=(2, 0))
 
         footer_meta = tk.Label(
             footer_frame,

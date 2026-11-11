@@ -4,7 +4,7 @@ Displays main protection status shield, telemetry metrics, and scan launch cards
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -76,6 +76,42 @@ class OverviewView(tk.Frame):
         )
         self.status_meta.pack(fill="x")
 
+        # 1.25 Operating Privilege & Enforcement Mode Banner
+        self.enforcement_frame = tk.Frame(self, bg=THEME["bg_panel"], padx=16, pady=10)
+        self.enforcement_frame.pack(fill="x", padx=20, pady=(0, 10))
+        self.enforcement_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        enf_left = tk.Frame(self.enforcement_frame, bg=THEME["bg_panel"])
+        enf_left.pack(side="left", fill="both", expand=True)
+
+        self.enforcement_title = tk.Label(
+            enf_left,
+            text="ENFORCEMENT MODE: VERIFYING PRIVILEGES...",
+            bg=THEME["bg_panel"],
+            fg=THEME["text_primary"],
+            font=(THEME["font_family"], 10, "bold"),
+            anchor="w",
+        )
+        self.enforcement_title.pack(fill="x")
+
+        self.enforcement_subtext = tk.Label(
+            enf_left,
+            text="Checking Windows security token integrity level and host capability boundaries.",
+            bg=THEME["bg_panel"],
+            fg=THEME["text_secondary"],
+            font=(THEME["font_family"], 8),
+            anchor="w",
+            justify="left",
+        )
+        self.enforcement_subtext.pack(fill="x", pady=(2, 0))
+
+        self.btn_priv_details = ttk.Button(
+            self.enforcement_frame,
+            text="Privilege Details",
+            command=self._show_privilege_details_dialog,
+        )
+        self.btn_priv_details.pack(side="right", padx=(10, 0))
+
         # 1.5 Active Cyber Defense Sentinels Telemetry Bar
         sentinels_bar = tk.Frame(self, bg=THEME["bg_panel"], padx=14, pady=8)
         sentinels_bar.pack(fill="x", padx=20, pady=(0, 15))
@@ -84,10 +120,11 @@ class OverviewView(tk.Frame):
         self.sentinel_labels = {}
         sentinel_configs = [
             ("behavioral", "⚡ Behavioral: ACTIVE"),
-            ("ransomware", "🛡️ Ransomware Shield: ACTIVE"),
-            ("usb", "🔌 USB Sentinel: ACTIVE"),
-            ("authenticode", "🔏 WinTrust Authenticode: ACTIVE"),
-            ("posture", "🎯 Baseline Audit: 5/5 CONTROLS PASSED"),
+            ("ransomware", "🛡️ Ransomware: ACTIVE"),
+            ("usb", "🔌 USB: ACTIVE"),
+            ("authenticode", "🔏 Authenticode: ACTIVE"),
+            ("posture", "🎯 Baseline: 5/5 PASSED"),
+            ("etw", "📡 ETW: DIAGNOSTIC PROBE"),
         ]
 
         for key, text in sentinel_configs:
@@ -98,7 +135,7 @@ class OverviewView(tk.Frame):
                 fg=THEME["accent_cyan"],
                 font=(THEME["font_family"], 8, "bold"),
             )
-            lbl.pack(side="left", padx=(0, 14))
+            lbl.pack(side="left", padx=(0, 10))
             self.sentinel_labels[key] = lbl
 
         # 2. Metric Stat Cards Grid
@@ -242,7 +279,105 @@ class OverviewView(tk.Frame):
             )
             usb_state = "ACTIVE" if summary.get("usb_sentinel_active") else "STANDBY"
             self.sentinel_labels["usb"].config(
-                text=f"🔌 USB Sentinel: {usb_state}",
+                text=f"🔌 USB: {usb_state}",
                 fg=THEME["status_safe"] if usb_state == "ACTIVE" else THEME["text_muted"],
             )
+            if "etw" in self.sentinel_labels:
+                etw_info = summary.get("etw_status", {})
+                etw_op = etw_info.get("operational_status", "PROBE")
+                self.sentinel_labels["etw"].config(
+                    text=f"📡 ETW: {etw_op}",
+                    fg=THEME["status_safe"] if "PERMITTED" in etw_op else THEME["accent_cyan"],
+                )
+
+        # Update Operating Mode & Enforcement Banner
+        enf = summary.get("enforcement_details", {})
+        if enf and hasattr(self, "enforcement_title"):
+            is_adm = enf.get("is_admin", False)
+            title_text = f"🛡️ {enf.get('mode_title', 'Administrator Mode')}" if is_adm else f"⚠️ {enf.get('mode_title', 'Standard User Mode')}"
+            self.enforcement_title.config(
+                text=title_text,
+                fg=enf.get("status_color", THEME["status_safe"]),
+            )
+            sub = (
+                f"Integrity Level: {enf.get('integrity_level')} — All host OS enforcement capabilities active."
+                if is_adm
+                else f"Integrity Level: {enf.get('integrity_level')} — {enf.get('restricted_count', 4)} capabilities operating in Audit-Only mode."
+            )
+            self.enforcement_subtext.config(text=sub)
+            border_color = enf.get("status_color", THEME["border"])
+            self.enforcement_frame.configure(highlightbackground=border_color)
+
+    def _show_privilege_details_dialog(self) -> None:
+        """Display dialog explaining permission state, available vs audit-only capabilities."""
+        summary = self.engine.get_dashboard_summary()
+        enf = summary.get("enforcement_details", {})
+        if not enf:
+            from bi_antivirus.core.privilege_manager import PrivilegeManager
+            enf = PrivilegeManager.get_enforcement_details()
+
+        dialog = tk.Toplevel(self)
+        dialog.title("Operating Privilege & Host Enforcement Details")
+        dialog.geometry("720x520")
+        dialog.configure(bg=THEME["bg_dark"])
+        dialog.transient(self)
+        dialog.grab_set()
+
+        hdr = tk.Frame(dialog, bg=THEME["bg_panel"], padx=16, pady=12)
+        hdr.pack(fill="x", padx=14, pady=14)
+        tk.Label(
+            hdr,
+            text=enf.get("mode_title", "Privilege State"),
+            font=(THEME["font_family"], 12, "bold"),
+            bg=THEME["bg_panel"],
+            fg=enf.get("status_color", THEME["text_primary"]),
+        ).pack(anchor="w")
+        tk.Label(
+            hdr,
+            text=f"Process Security Token: {enf.get('integrity_level', 'Unknown')}",
+            font=(THEME["font_family"], 9),
+            bg=THEME["bg_panel"],
+            fg=THEME["text_secondary"],
+        ).pack(anchor="w", pady=(2, 0))
+
+        expl_frame = tk.Frame(dialog, bg=THEME["bg_dark"], padx=14)
+        expl_frame.pack(fill="x")
+        tk.Label(
+            expl_frame,
+            text=enf.get("explanation", ""),
+            font=(THEME["font_family"], 9),
+            bg=THEME["bg_dark"],
+            fg=THEME["text_primary"],
+            wraplength=680,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
+
+        tree_frame = tk.Frame(dialog, bg=THEME["bg_dark"], padx=14)
+        tree_frame.pack(fill="both", expand=True)
+
+        columns = ("feature", "state", "enforcement", "elevation")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8)
+        tree.heading("feature", text="Security Subsystem")
+        tree.heading("state", text="Operational State")
+        tree.heading("enforcement", text="Enforcement Mode")
+        tree.heading("elevation", text="Admin Required?")
+
+        tree.column("feature", width=220)
+        tree.column("state", width=120)
+        tree.column("enforcement", width=230)
+        tree.column("elevation", width=110)
+
+        for fid, f in enf.get("features", {}).items():
+            tree.insert("", "end", values=(
+                f["name"],
+                f["state"],
+                f["enforcement"],
+                "Yes" if f["requires_elevation"] else "No",
+            ))
+
+        tree.pack(fill="both", expand=True)
+
+        btn_box = tk.Frame(dialog, bg=THEME["bg_dark"], padx=14, pady=12)
+        btn_box.pack(fill="x")
+        ttk.Button(btn_box, text="Close", command=dialog.destroy).pack(side="right")
 

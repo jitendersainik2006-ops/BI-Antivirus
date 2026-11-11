@@ -56,6 +56,8 @@ from bi_antivirus.core.edr_engine import EDREngine
 from bi_antivirus.enterprise.cloud_sandbox import CloudSandboxClient
 from bi_antivirus.enterprise.rbac_manager import RBACManager
 from bi_antivirus.enterprise.siem_exporter import SIEMExporter
+from bi_antivirus.core.privilege_manager import PrivilegeManager, is_user_admin
+from bi_antivirus.monitors.etw_telemetry import ETWTelemetryProbe
 
 
 class AntivirusEngine:
@@ -186,6 +188,12 @@ class AntivirusEngine:
 
         # 31. SIEM Exporter & Cryptographic Hash Chaining Sentinel
         self.siem_exporter = SIEMExporter()
+
+        # 32. Privilege & Enforcement Mode Manager
+        self.privilege_manager = PrivilegeManager()
+
+        # 33. Event Tracing for Windows (ETW) Telemetry Probe
+        self.etw_probe = ETWTelemetryProbe(check_registry_on_init=False)
 
         # Live Status
         self.system_status = "PROTECTED"
@@ -662,6 +670,8 @@ class AntivirusEngine:
             "webhook_enabled": settings.get("webhook_enabled", False),
             "webhook_url": settings.get("webhook_url", "http://127.0.0.1:5678/webhook/bi-threat-alert"),
             "recent_dispatches": self.dispatcher.dispatched_history,
+            "enforcement_details": self.privilege_manager.get_enforcement_details(),
+            "etw_status": self.etw_probe.get_etw_status(),
         }
 
     def quarantine_threat(self, threat_info: Dict[str, Any]) -> Dict[str, Any]:

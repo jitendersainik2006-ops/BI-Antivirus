@@ -4,7 +4,7 @@
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-2.0.0--ENTERPRISE-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-230%2F230%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-236%2F236%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -74,6 +74,8 @@ The primary architectural mandate is **strict non-destructive security and local
 | **Advanced EDR Correlation & Threat Feed Freshness** | Rapid telemetry event deduplication, dynamic confidence scoring ($0.60$ to $0.95$), SOC analyst decision audit trail, structured forensic investigation reporting, signed threat feed TTL expiration gating, and hexadecimal IOC schema validation. | **VERIFIED (Sprint 9 Hardened)** |
 | **Dynamic Sandbox Simulation & ML Validation Benchmark** | Standardized sandbox capability discovery, honest local simulation disclosure, and formal validation dataset benchmarking (`evaluate_corpus`) computing accuracy, precision, recall, and false positive rates. | **VERIFIED (Sprint 10 Hardened)** |
 | **Enterprise Fleet Scalability & Zero-Lock Backups** | Indexed count queries (`count_endpoints`), limit/offset pagination for multi-thousand endpoint management, and online zero-lock atomic database backups via SQLite backup API. | **VERIFIED (Sprint 11 Hardened)** |
+| **Host Enforcement & Privilege Mode Visibility** | Real-time detection of Administrator Mode (Full Enforcement) vs Standard User Mode (Audit Only), UI status banners, and transparent capability restriction auditing. | **VERIFIED (Sprint 13 Verified)** |
+| **Windows Event Tracing (ETW) Telemetry Probe** | Discovers registered Windows ETW providers (`Microsoft-Windows-Kernel-Process`, `Microsoft-Windows-Threat-Intelligence`), gates kernel session permissions, and logs non-PII diagnostics with graceful Toolhelp32 fallback. | **VERIFIED (Sprint 13 Verified)** |
 
 ### Planned Future Features (Roadmap)
 - **Kernel Mini-Filter Driver**: Transitioning filesystem interception from user-space polling to a certified Windows Kernel Mini-Filter Driver for instantaneous I/O pre-execution blocking.
@@ -334,21 +336,21 @@ flowchart LR
 
 ## 11. Automated Test Results
 
-The platform includes a comprehensive 230-test automated validation suite executed across 39 test modules (`python run_tests.py`):
+The platform includes a comprehensive 236-test automated validation suite executed across 40 test modules (`python run_tests.py`):
 
 ```text
 ======================================================================
       BI ANTIVIRUS - AUTOMATED VALIDATION TEST SUITE
 ======================================================================
-Ran 230 tests in 162.886s
+Ran 236 tests in 166.651s
 
 OK
 ======================================================================
-Tests Run:      230
+Tests Run:      236
 Failures:       0
 Errors:         0
 Skipped:        0
-Overall Status: SUCCESS (100% PASS RATE - ALL 230 TESTS PASSED)
+Overall Status: SUCCESS (100% PASS RATE - ALL 236 TESTS PASSED)
 ======================================================================
 ```
 

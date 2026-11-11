@@ -9,6 +9,7 @@ from tkinter import ttk
 import threading
 
 from bi_antivirus.config import THEME
+from bi_antivirus.core.privilege_manager import is_user_admin
 
 
 class FirewallView(tk.Frame):
@@ -80,6 +81,23 @@ class FirewallView(tk.Frame):
             pady=6,
         )
         self.lbl_public.pack(side="left")
+
+        is_adm = is_user_admin()
+        status_note = (
+            "🛡️ Enforcement Mode: Administrator (Active netsh rule application and rollback supported)"
+            if is_adm
+            else "⚠️ Enforcement Mode: Standard User (Audit-Only; active netsh rule changes require Administrator elevation)"
+        )
+        note_color = THEME["status_safe"] if is_adm else THEME["status_warning"]
+        self.lbl_enforcement_note = tk.Label(
+            header_frame,
+            text=status_note,
+            bg=THEME["bg_panel"],
+            fg=note_color,
+            font=(THEME["font_family"], 8, "bold"),
+            anchor="w",
+        )
+        self.lbl_enforcement_note.pack(fill="x", pady=(8, 0))
 
         # Network Connections Table
         table_container = tk.Frame(self, bg=THEME["bg_input"])
