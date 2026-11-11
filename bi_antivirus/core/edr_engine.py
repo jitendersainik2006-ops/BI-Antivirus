@@ -154,6 +154,9 @@ class EDRIncident:
     tactics_detected: List[str] = field(default_factory=list)
     techniques_detected: List[str] = field(default_factory=list)
     risk_score: float = 0.0
+    confidence: float = 0.50
+    incident_status: str = "OPEN"  # OPEN, INVESTIGATING, CONTAINED, FALSE_POSITIVE, CLOSED
+    analyst_notes: List[Dict[str, Any]] = field(default_factory=list)
     root_cause_analysis: Dict[str, Any] = field(default_factory=dict)
     process_tree: Dict[str, Any] = field(default_factory=dict)
     response_recommendations: List[str] = field(default_factory=list)
@@ -171,6 +174,27 @@ class EDREngine:
         self.history_db = history_db
         self.telemetry_buffer: List[TelemetryEvent] = []
         self.incidents: Dict[str, EDRIncident] = {}
+
+    def deduplicate_events(self, events: List[TelemetryEvent], window_seconds: float = 5.0) -> List[TelemetryEvent]:
+        """
+        Deduplicate rapid repeated events within time window to prevent alert fatigue.
+        Collapses identical (event_type, pid, process_name, target_path, remote_ip) within window.
+        """
+        if not events:
+            return []
+
+        deduped = []
+        last_seen: Dict[Tuple[str, int, str, Optional[str], Optional[str]], float] = {}
+
+        for ev in events:
+            key = (ev.event_type, ev.pid, ev.process_name, ev.target_path, ev.remote_ip)
+            prev_time = last_seen.get(key)
+            if prev_time is not None and (ev.timestamp - prev_time) <= window_seconds:
+                continue
+            last_seen[key] = ev.timestamp
+            deduped.append(ev)
+
+        return deduped
 
     def normalize_event(
         self,
@@ -237,7 +261,7 @@ class EDREngine:
     ) -> EDRIncident:
         """
         Group related events into a unified security incident, execute root-cause analysis,
-        construct process trees, compute dynamic risk scores, and assign response actions.
+        construct process trees, compute dynamic risk scores, evaluate confidence, and assign response actions.
         """
         if not events:
             return EDRIncident(title="Empty Incident")
@@ -253,10 +277,18 @@ class EDREngine:
             raw_score += ev.risk_score
 
         # 2. Dynamic explainable risk scoring (0-100)
-        # Multiple tactics scale the risk non-linearly (multi-stage attack)
         tactic_count = len(all_tactics)
         tactic_multiplier = 1.0 + (tactic_count * 0.15)
         computed_score = min(round(raw_score * tactic_multiplier, 1), 100.0)
+
+        # 2.1 Multi-vector confidence assessment
+        event_types = {e.event_type for e in events}
+        if len(event_types) >= 3 or tactic_count >= 3:
+            confidence = 0.95
+        elif len(event_types) >= 2 or tactic_count >= 2:
+            confidence = 0.80
+        else:
+            confidence = 0.60
 
         # 3. Severity classification
         if computed_score >= 75.0 or any("Impact" in t or "Credential Access" in t for t in all_tactics):
@@ -285,6 +317,7 @@ class EDREngine:
             tactics_detected=sorted(list(all_tactics)),
             techniques_detected=sorted(list(all_techniques)),
             risk_score=computed_score,
+            confidence=confidence,
             root_cause_analysis=rca,
             process_tree=process_tree,
             response_recommendations=recommendations,
@@ -292,6 +325,67 @@ class EDREngine:
 
         self.incidents[incident.incident_id] = incident
         return incident
+
+    def record_analyst_decision(
+        self,
+        incident_id: str,
+        analyst_user: str,
+        action: str,
+        notes: str,
+        status: str = "INVESTIGATING",
+    ) -> bool:
+        """Record auditable analyst triage action or disposition decision."""
+        incident = self.incidents.get(incident_id)
+        if not incident:
+            return False
+
+        record = {
+            "timestamp": time.time(),
+            "analyst": analyst_user,
+            "action": action,
+            "notes": notes,
+            "new_status": status,
+        }
+        incident.analyst_notes.append(record)
+        incident.incident_status = status
+        logger.info(f"Analyst {analyst_user} updated incident {incident_id}: action={action}, status={status}")
+        return True
+
+    def generate_investigation_report(self, incident_id: str) -> Optional[Dict[str, Any]]:
+        """Generate a structured, auditable investigation package for analysts."""
+        incident = self.incidents.get(incident_id)
+        if not incident:
+            return None
+
+        timeline = []
+        for ev in sorted(incident.events, key=lambda e: e.timestamp):
+            timeline.append({
+                "timestamp": ev.timestamp,
+                "event_type": ev.event_type,
+                "process": ev.process_name,
+                "pid": ev.pid,
+                "target": ev.target_path or ev.remote_ip or "N/A",
+                "tactics": ev.mitre_tactics,
+                "risk_contribution": ev.risk_score,
+            })
+
+        return {
+            "incident_id": incident.incident_id,
+            "title": incident.title,
+            "severity": incident.severity,
+            "confidence": incident.confidence,
+            "risk_score": incident.risk_score,
+            "status": incident.incident_status,
+            "created_at": incident.created_at,
+            "root_cause_analysis": incident.root_cause_analysis,
+            "tactics_detected": incident.tactics_detected,
+            "techniques_detected": incident.techniques_detected,
+            "event_count": len(incident.events),
+            "timeline": timeline,
+            "process_tree": incident.process_tree,
+            "response_recommendations": incident.response_recommendations,
+            "analyst_audit_log": incident.analyst_notes,
+        }
 
     def _execute_root_cause_analysis(self, events: List[TelemetryEvent]) -> Dict[str, Any]:
         """

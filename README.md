@@ -2,9 +2,9 @@
 ### Enterprise-Grade Windows Endpoint Security with Autonomous n8n Workflow Automation
 
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
-[![Platform Version](https://img.shields.io/badge/Platform-1.1.0--PRO-00b4d8.svg)](#)
+[![Platform Version](https://img.shields.io/badge/Platform-2.0.0--ENTERPRISE-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-205%2F205%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-230%2F230%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -69,6 +69,11 @@ The primary architectural mandate is **strict non-destructive security and local
 | **Firewall Management Integration** | Active profile status inspection (Domain, Private, Public); reversible staged rule lifecycle (`stage_firewall_rule`); mandatory admin authorization gate; netsh rule application and rollback. | **VERIFIED (5/5 Tests Pass)** |
 | **Cloud Sandbox Abstraction** | Standardized enterprise contract (`submit_sample`, `poll_status`), truthful capability disclosure, and deterministic local simulation provider with synthetic behavioral IOC generation. | **VERIFIED (3/3 Tests Pass)** |
 | **Enterprise RBAC & SIEM Hash Chaining** | Multi-tier roles (`SUPER_ADMIN`, `SEC_OPS`, `AUDITOR`, `READ_ONLY`) with permission matrices, session token management, CEF / RFC 5424 Syslog / JSON exporters, and cryptographic hash chaining ($H_i = \text{SHA256}(H_{i-1} \parallel \text{entry}_i)$). | **VERIFIED (8/8 Tests Pass)** |
+| **Hardened Zero-Trust RBAC & Session Revocation** | Unique 128-bit cryptographic salts per user (`secrets.token_hex(16)`), PBKDF2-HMAC-SHA256, explicit session token prefixing (`BI-SESS-`), immediate user session termination on deactivation or password change, and path traversal validation on quarantine restore. | **VERIFIED (Sprint 7 Hardened)** |
+| **High-Throughput Real-Time Sentinel & Reputation Cache** | LRU in-memory reputation cache with configurable TTL and hit/miss telemetry, formal protection state machine (`RUNNING`, `PAUSED`, `STOPPED`), health status diagnostics API, and internal self-event loop suppression. | **VERIFIED (Sprint 8 Hardened)** |
+| **Advanced EDR Correlation & Threat Feed Freshness** | Rapid telemetry event deduplication, dynamic confidence scoring ($0.60$ to $0.95$), SOC analyst decision audit trail, structured forensic investigation reporting, signed threat feed TTL expiration gating, and hexadecimal IOC schema validation. | **VERIFIED (Sprint 9 Hardened)** |
+| **Dynamic Sandbox Simulation & ML Validation Benchmark** | Standardized sandbox capability discovery, honest local simulation disclosure, and formal validation dataset benchmarking (`evaluate_corpus`) computing accuracy, precision, recall, and false positive rates. | **VERIFIED (Sprint 10 Hardened)** |
+| **Enterprise Fleet Scalability & Zero-Lock Backups** | Indexed count queries (`count_endpoints`), limit/offset pagination for multi-thousand endpoint management, and online zero-lock atomic database backups via SQLite backup API. | **VERIFIED (Sprint 11 Hardened)** |
 
 ### Planned Future Features (Roadmap)
 - **Kernel Mini-Filter Driver**: Transitioning filesystem interception from user-space polling to a certified Windows Kernel Mini-Filter Driver for instantaneous I/O pre-execution blocking.
@@ -329,21 +334,21 @@ flowchart LR
 
 ## 11. Automated Test Results
 
-The platform includes a comprehensive 169-test automated validation suite executed across 28 test modules (`python -m unittest discover -s bi_antivirus/tests -p "test_*.py"`):
+The platform includes a comprehensive 230-test automated validation suite executed across 39 test modules (`python run_tests.py`):
 
-```
+```text
 ======================================================================
-      BI ANTIVIRUS - COMPREHENSIVE AUTOMATED TEST SUITE
+      BI ANTIVIRUS - AUTOMATED VALIDATION TEST SUITE
 ======================================================================
-Ran 169 tests in 45.598s
+Ran 230 tests in 162.886s
 
 OK
 ======================================================================
-Tests Run:      169
+Tests Run:      230
 Failures:       0
 Errors:         0
 Skipped:        0
-Overall Status: SUCCESS (100% PASS RATE)
+Overall Status: SUCCESS (100% PASS RATE - ALL 230 TESTS PASSED)
 ======================================================================
 ```
 

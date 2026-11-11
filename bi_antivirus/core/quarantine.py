@@ -540,6 +540,9 @@ class QuarantineManager:
             return False, f"Quarantine vault file not found on disk: {vault_file_path}"
 
         target_path = Path(custom_target_path) if custom_target_path else Path(record["original_path"])
+        # Path traversal sanitization check
+        if ".." in target_path.parts:
+            return False, f"Refusing to restore file: Path traversal sequence detected in '{target_path}'"
         if not overwrite and target_path.exists():
             return False, f"Destination file already exists: {target_path}. Restoration aborted to prevent overwriting."
         target_path.parent.mkdir(parents=True, exist_ok=True)

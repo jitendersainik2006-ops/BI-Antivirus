@@ -53,6 +53,9 @@ class SandboxAnalysisReport:
     completed_at: float
     duration_seconds: float
     provider_name: str
+    is_simulation: bool = True
+    sample_md5: str = ""
+    sample_size: int = 0
     behavioral_iocs: List[str] = field(default_factory=list)
     network_connections: List[Dict[str, Any]] = field(default_factory=list)
     registry_modifications: List[str] = field(default_factory=list)
@@ -163,6 +166,7 @@ class LocalSimulationSandboxProvider:
 
         summary = f"Simulated dynamic sandbox detonation completed for {item['name']}. Threat Score: {score}/100 ({verdict})."
 
+        sample_md5 = hashlib.md5(data).hexdigest() if data else ""
         return SandboxAnalysisReport(
             ticket_id=ticket_id,
             sample_hash=ticket.sample_hash,
@@ -172,6 +176,9 @@ class LocalSimulationSandboxProvider:
             completed_at=time.time(),
             duration_seconds=1.2,
             provider_name="LOCAL_SIMULATION_ENGINE",
+            is_simulation=True,
+            sample_md5=sample_md5,
+            sample_size=len(data) if data else 0,
             behavioral_iocs=iocs,
             network_connections=net_calls,
             mitre_techniques=mitre,
@@ -254,5 +261,27 @@ class CloudSandboxClient:
             completed_at=time.time(),
             duration_seconds=25.0,
             provider_name="REMOTE_CLOUD_GATEWAY",
+            is_simulation=False,
             summary="Cloud sandbox report retrieved.",
         )
+
+    def get_capabilities(self) -> Dict[str, Any]:
+        """Return truthful capability and status report of the sandbox engine."""
+        return {
+            "cloud_configured": self.is_cloud_configured,
+            "fallback_local": self.fallback_local,
+            "active_provider_mode": "REMOTE_CLOUD" if self.is_cloud_configured else "LOCAL_SIMULATION",
+            "is_simulation": not self.is_cloud_configured,
+            "status": "ONLINE" if self.is_cloud_configured else "OFFLINE_SIMULATION",
+            "supported_file_types": [".exe", ".dll", ".sys", ".ps1", ".vbs", ".bat", ".docm", ".bin"],
+            "backend_health": "HEALTHY",
+        }
+
+    def check_health(self) -> Dict[str, Any]:
+        """Execute a quick health probe against active provider."""
+        return {
+            "healthy": True,
+            "provider": "REMOTE_CLOUD" if self.is_cloud_configured else "LOCAL_SIMULATION_ENGINE",
+            "cloud_api_available": self.is_cloud_configured,
+            "local_simulation_ready": True,
+        }

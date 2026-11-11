@@ -10,6 +10,7 @@ Supported Roles:
 - READ_ONLY: Basic operational status viewing and local scan history review.
 """
 
+import secrets
 import time
 import uuid
 import hmac
@@ -71,6 +72,7 @@ class UserAccount:
     username: str
     role: str
     password_hash: str
+    salt: str = field(default="")
     created_at: float = field(default_factory=time.time)
     is_active: bool = True
 
@@ -104,10 +106,10 @@ class RBACManager:
         # Initialize default administrative accounts
         self._init_default_accounts()
 
-    def _hash_password(self, password: str) -> str:
-        """Secure PBKDF2 password hash."""
-        salt = b"BI_SALT_ENTERPRISE_2026"
-        return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000).hex()
+    def _hash_password(self, password: str, salt: Optional[str] = None) -> str:
+        """PBKDF2 password hash with unique salt or backward-compatible legacy salt."""
+        s = salt.encode("utf-8") if salt else b"BI_SALT_ENTERPRISE_2026"
+        return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), s, 100_000).hex()
 
     def _init_default_accounts(self) -> None:
         """Create bootstrap accounts for standard roles."""
@@ -117,15 +119,19 @@ class RBACManager:
         self.create_user("guest", "READ_ONLY", "GuestReadOnly123!")
 
     def create_user(self, username: str, role: str, password: str) -> bool:
-        """Create or update a user account with assigned role."""
+        """Create or update a user account with assigned role and unique salt."""
         if role not in ROLE_PERMISSIONS:
             raise ValueError(f"Invalid role: {role}. Must be one of {list(ROLE_PERMISSIONS.keys())}")
 
         uname = username.lower().strip()
+        unique_salt = secrets.token_hex(16)
+        pwd_hash = self._hash_password(password, salt=unique_salt)
+
         self._users[uname] = UserAccount(
             username=uname,
             role=role,
-            password_hash=self._hash_password(password),
+            password_hash=pwd_hash,
+            salt=unique_salt,
         )
         return True
 
@@ -136,7 +142,8 @@ class RBACManager:
         if not user or not user.is_active:
             return None
 
-        expected_hash = self._hash_password(password)
+        # Verify password using per-user salt or legacy salt fallback
+        expected_hash = self._hash_password(password, salt=user.salt) if user.salt else self._hash_password(password)
         if not hmac.compare_digest(user.password_hash, expected_hash):
             return None
 
@@ -147,16 +154,79 @@ class RBACManager:
         return session
 
     def validate_session(self, session_token: str) -> Optional[UserSession]:
-        """Validate session token and verify expiration."""
+        """Validate session token, verify expiration and active user status."""
         sess = self._sessions.get(session_token)
         if not sess:
             return None
 
+        # Check expiration
         if time.time() > sess.expires_at:
             del self._sessions[session_token]
             return None
 
+        # Check user active status
+        user = self._users.get(sess.username)
+        if not user or not user.is_active:
+            del self._sessions[session_token]
+            return None
+
         return sess
+
+    def revoke_session(self, session_id: str) -> bool:
+        """Explicitly revoke an active session token."""
+        if session_id in self._sessions:
+            del self._sessions[session_id]
+            return True
+        return False
+
+    def revoke_user_sessions(self, username: str) -> int:
+        """Revoke all active sessions belonging to a specific user."""
+        uname = username.lower().strip()
+        to_revoke = [sid for sid, s in self._sessions.items() if s.username == uname]
+        for sid in to_revoke:
+            del self._sessions[sid]
+        return len(to_revoke)
+
+    def deactivate_user(self, username: str) -> bool:
+        """Deactivate a user account and immediately terminate all active sessions."""
+        uname = username.lower().strip()
+        user = self._users.get(uname)
+        if not user:
+            return False
+        user.is_active = False
+        self.revoke_user_sessions(uname)
+        return True
+
+    def update_user_role(self, username: str, new_role: str) -> bool:
+        """Update user role and synchronize existing active sessions."""
+        if new_role not in ROLE_PERMISSIONS:
+            raise ValueError(f"Invalid role: {new_role}. Must be one of {list(ROLE_PERMISSIONS.keys())}")
+        uname = username.lower().strip()
+        user = self._users.get(uname)
+        if not user:
+            return False
+        user.role = new_role
+        for s in self._sessions.values():
+            if s.username == uname:
+                s.role = new_role
+        return True
+
+    def change_password(self, username: str, old_password: str, new_password: str) -> bool:
+        """Change user password, generate fresh salt, and revoke all active sessions."""
+        uname = username.lower().strip()
+        user = self._users.get(uname)
+        if not user or not user.is_active:
+            return False
+
+        expected_hash = self._hash_password(old_password, salt=user.salt) if user.salt else self._hash_password(old_password)
+        if not hmac.compare_digest(user.password_hash, expected_hash):
+            return False
+
+        fresh_salt = secrets.token_hex(16)
+        user.salt = fresh_salt
+        user.password_hash = self._hash_password(new_password, salt=fresh_salt)
+        self.revoke_user_sessions(uname)
+        return True
 
     def has_permission(self, role: str, permission: str) -> bool:
         """Check if role holds specified permission."""
@@ -169,7 +239,7 @@ class RBACManager:
         Returns: (is_authorized, reason)
         """
         # Check if argument is a session token
-        if role_or_session in self._sessions:
+        if role_or_session in self._sessions or role_or_session.startswith("BI-SESS-"):
             sess = self.validate_session(role_or_session)
             if not sess:
                 return False, "Session has expired or is invalid."

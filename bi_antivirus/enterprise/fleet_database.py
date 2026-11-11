@@ -9,7 +9,7 @@ import threading
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from bi_antivirus.config import FLEET_DB_PATH
 from bi_antivirus.enterprise.fleet_models import (
@@ -314,8 +314,10 @@ class FleetDatabase:
         health_status: Optional[str] = None,
         department: Optional[str] = None,
         tag: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
     ) -> List[EndpointDevice]:
-        """List endpoints matching optional filters."""
+        """List endpoints matching optional filters with pagination support."""
         with self._lock:
             try:
                 with self._get_connection() as conn:
@@ -330,7 +332,13 @@ class FleetDatabase:
                         query += " AND department = ?"
                         params.append(department)
 
-                    cursor.execute(query + " ORDER BY hostname ASC", params)
+                    query += " ORDER BY hostname ASC"
+
+                    if limit is not None:
+                        query += " LIMIT ? OFFSET ?"
+                        params.extend([limit, offset])
+
+                    cursor.execute(query, params)
                     rows = cursor.fetchall()
                     endpoints = [EndpointDevice.from_dict(dict(r)) for r in rows]
 
@@ -342,6 +350,61 @@ class FleetDatabase:
             except Exception as e:
                 logger.error(f"Failed listing endpoints: {e}")
                 return []
+
+    def count_endpoints(
+        self,
+        health_status: Optional[str] = None,
+        department: Optional[str] = None,
+    ) -> int:
+        """Count total registered endpoints matching optional filters."""
+        with self._lock:
+            try:
+                with self._get_connection() as conn:
+                    cursor = conn.cursor()
+                    query = "SELECT COUNT(*) FROM fleet_endpoints WHERE 1=1"
+                    params: List[Any] = []
+                    if health_status:
+                        query += " AND health_status = ?"
+                        params.append(health_status)
+                    if department:
+                        query += " AND department = ?"
+                        params.append(department)
+                    cursor.execute(query, params)
+                    return cursor.fetchone()[0]
+            except Exception as e:
+                logger.error(f"Failed counting endpoints: {e}")
+                return 0
+
+    def backup_database(self, backup_path: Path) -> Tuple[bool, str]:
+        """Create an online zero-lock atomic backup of the active WAL database."""
+        bpath = Path(backup_path)
+        bpath.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            try:
+                with self._get_connection() as src_conn:
+                    with sqlite3.connect(str(bpath)) as dest_conn:
+                        src_conn.backup(dest_conn)
+                logger.info(f"Fleet database successfully backed up to {bpath}")
+                return True, f"Database backup created at {bpath}"
+            except Exception as e:
+                logger.error(f"Failed backing up database to {bpath}: {e}")
+                return False, f"Backup error: {str(e)}"
+
+    def restore_database(self, backup_path: Path) -> Tuple[bool, str]:
+        """Restore database from backup file safely using online restore."""
+        bpath = Path(backup_path)
+        if not bpath.exists():
+            return False, f"Backup file not found: {bpath}"
+        with self._lock:
+            try:
+                with sqlite3.connect(str(bpath)) as src_conn:
+                    with self._get_connection() as dest_conn:
+                        src_conn.backup(dest_conn)
+                logger.info(f"Fleet database restored from {bpath}")
+                return True, f"Database restored successfully from {bpath}"
+            except Exception as e:
+                logger.error(f"Failed restoring database from {bpath}: {e}")
+                return False, f"Restore error: {str(e)}"
 
     def delete_endpoint(self, endpoint_id: str) -> bool:
         """Delete an endpoint record."""

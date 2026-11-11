@@ -22,10 +22,79 @@ from bi_antivirus.config import (
 )
 from bi_antivirus.core.detector import ThreatDetector
 from bi_antivirus.core.quarantine import QuarantineManager
+import hashlib
 from bi_antivirus.database.history import HistoryDatabase
 from bi_antivirus.core.ml_engine import LocalMLEngine
 
 logger = logging.getLogger("bi_antivirus.realtime")
+
+
+class ProtectionState:
+    STOPPED = "STOPPED"
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+
+
+class FileReputationCache:
+    """
+    In-memory LRU cache for file hashes and safe reputation status.
+    Avoids redundant expensive disk I/O and static analysis on repeated access
+    to known-clean or previously audited files.
+    """
+
+    def __init__(self, max_entries: int = 5000, ttl_seconds: float = 3600.0):
+        self.max_entries = max_entries
+        self.ttl_seconds = ttl_seconds
+        self._cache: Dict[str, Tuple[str, float]] = {}  # sha256 -> (reputation, timestamp)
+        self._lock = threading.Lock()
+        self.hits = 0
+        self.misses = 0
+
+    def get_reputation(self, sha256: str) -> Optional[str]:
+        """Look up reputation for a given SHA-256 hash if within TTL."""
+        if not sha256:
+            return None
+        now = time.time()
+        with self._lock:
+            entry = self._cache.get(sha256)
+            if not entry:
+                self.misses += 1
+                return None
+            rep, ts = entry
+            if now - ts > self.ttl_seconds:
+                del self._cache[sha256]
+                self.misses += 1
+                return None
+            self.hits += 1
+            return rep
+
+    def set_reputation(self, sha256: str, reputation: str) -> None:
+        """Store or update reputation for a hash."""
+        if not sha256:
+            return
+        now = time.time()
+        with self._lock:
+            if len(self._cache) >= self.max_entries and sha256 not in self._cache:
+                oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k][1])
+                del self._cache[oldest_key]
+            self._cache[sha256] = (reputation, now)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._cache.clear()
+            self.hits = 0
+            self.misses = 0
+
+    def stats(self) -> Dict[str, Any]:
+        with self._lock:
+            total = self.hits + self.misses
+            ratio = round((self.hits / total) * 100, 2) if total > 0 else 0.0
+            return {
+                "entries": len(self._cache),
+                "hits": self.hits,
+                "misses": self.misses,
+                "hit_ratio_percent": ratio,
+            }
 
 
 class RealTimeGuard:
@@ -34,6 +103,8 @@ class RealTimeGuard:
     Features:
     - Event Debouncing: Buffers rapid successive writes to ensure complete file writes before analysis.
     - Priority Scanning: High-priority queue for volatile ingress directories (%TEMP%, Downloads).
+    - Safe File Reputation: LRU hash cache bypassing repeat analysis of verified benign files.
+    - Protection State Lifecycle: RUNNING, PAUSED, and STOPPED states with health monitoring.
     - Self-Event Suppression: Suppresses internal file I/O from logs, quarantine, and database writes.
     - Local ML Static Classification: Leverages on-device ML model on dropped Windows PE binaries.
     """
@@ -55,6 +126,12 @@ class RealTimeGuard:
         self.debounce_window = debounce_window
 
         self.is_running = False
+        self.state = ProtectionState.STOPPED
+        self.start_time: float = 0.0
+        self.last_scan_time: float = 0.0
+        self.error_count: int = 0
+        self.reputation_cache = FileReputationCache()
+
         self._stop_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
         self._known_file_states: Dict[str, float] = {}  # filepath -> mtime
@@ -132,6 +209,8 @@ class RealTimeGuard:
         self.update_monitored_paths()
         self._stop_event.clear()
         self.is_running = True
+        self.state = ProtectionState.RUNNING
+        self.start_time = time.time()
 
         # Initial baseline snapshot of directory files
         self._build_baseline()
@@ -141,11 +220,28 @@ class RealTimeGuard:
         logger.info(f"Real-Time Guard active, monitoring {len(self.monitored_paths)} folders ({len(self.priority_paths)} priority).")
         return True
 
+    def pause(self) -> bool:
+        """Temporarily pause real-time filesystem event processing."""
+        if not self.is_running or self.state != ProtectionState.RUNNING:
+            return False
+        self.state = ProtectionState.PAUSED
+        logger.info("Real-Time Guard paused.")
+        return True
+
+    def resume(self) -> bool:
+        """Resume real-time filesystem event processing."""
+        if not self.is_running or self.state != ProtectionState.PAUSED:
+            return False
+        self.state = ProtectionState.RUNNING
+        logger.info("Real-Time Guard resumed.")
+        return True
+
     def stop(self) -> None:
         """Stop background real-time guard."""
         if not self.is_running:
             return
         self.is_running = False
+        self.state = ProtectionState.STOPPED
         self._stop_event.set()
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=2.0)
@@ -205,6 +301,10 @@ class RealTimeGuard:
     def _monitor_loop(self) -> None:
         """Continuous polling loop detecting newly dropped or changed files."""
         while not self._stop_event.is_set():
+            if self.state == ProtectionState.PAUSED:
+                time.sleep(0.5)
+                continue
+
             try:
                 # 1. Process priority paths first (Downloads, Temp)
                 ordered_dirs = self.priority_paths + [p for p in self.monitored_paths if p not in self.priority_paths]
@@ -243,6 +343,7 @@ class RealTimeGuard:
                 self._process_debounce_queue()
 
             except Exception as e:
+                self.error_count += 1
                 logger.error(f"Error in real-time monitor loop: {e}")
 
             # Sleep between survey cycles
@@ -256,6 +357,21 @@ class RealTimeGuard:
         if self._is_self_event(file_path):
             self.suppressed_self_events += 1
             return
+
+        self.last_scan_time = time.time()
+        fast_hash = ""
+
+        # Check reputation cache before reading full file or analyzing
+        try:
+            with open(file_path, "rb") as f_peek:
+                peek_data = f_peek.read(65536)
+            fast_hash = hashlib.sha256(peek_data).hexdigest()
+            cached_rep = self.reputation_cache.get_reputation(fast_hash)
+            if cached_rep == "CLEAN":
+                self.events_processed += 1
+                return
+        except Exception:
+            pass
 
         self.events_processed += 1
 
@@ -279,6 +395,8 @@ class RealTimeGuard:
                     logger.debug(f"Real-time ML evaluation skipped: {ex}")
 
             if is_threat:
+                if fast_hash:
+                    self.reputation_cache.set_reputation(fast_hash, "THREAT")
                 self.threats_detected += 1
                 logger.warning(f"REAL-TIME THREAT DETECTED: {result['threat_name']} in {file_path}")
 
@@ -309,14 +427,19 @@ class RealTimeGuard:
                         self.on_threat_detected(result)
                     except Exception:
                         pass
+            else:
+                if fast_hash:
+                    self.reputation_cache.set_reputation(fast_hash, "CLEAN")
 
         except Exception as e:
+            self.error_count += 1
             logger.debug(f"Failed analyzing file in real-time guard: {e}")
 
     def get_guard_status(self) -> Dict[str, Any]:
         """Return diagnostic metrics of the real-time guard."""
         return {
             "is_running": self.is_running,
+            "state": self.state,
             "monitored_paths_count": len(self.monitored_paths),
             "priority_paths_count": len(self.priority_paths),
             "events_processed": self.events_processed,
@@ -324,4 +447,22 @@ class RealTimeGuard:
             "suppressed_self_events": self.suppressed_self_events,
             "debounce_queue_size": len(self._debounce_queue),
             "known_files_count": len(self._known_file_states),
+            "cache_stats": self.reputation_cache.stats(),
+        }
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """Return comprehensive health and operational indicators for the service."""
+        uptime = round(time.time() - self.start_time, 1) if self.start_time > 0 and self.is_running else 0.0
+        return {
+            "healthy": self.is_running and self.state == ProtectionState.RUNNING,
+            "state": self.state,
+            "uptime_seconds": uptime,
+            "last_scan_timestamp": self.last_scan_time,
+            "monitored_paths_count": len(self.monitored_paths),
+            "priority_paths_count": len(self.priority_paths),
+            "events_processed": self.events_processed,
+            "threats_detected": self.threats_detected,
+            "suppressed_self_events": self.suppressed_self_events,
+            "error_count": self.error_count,
+            "reputation_cache": self.reputation_cache.stats(),
         }

@@ -358,3 +358,64 @@ class LocalMLEngine:
         except Exception as e:
             logger.error(f"Failed persisting rollback model: {e}")
             return False, f"Rollback persistence error: {e}"
+
+    def evaluate_corpus(self, samples: List[Tuple[Any, str]]) -> Dict[str, Any]:
+        """
+        Evaluate classification metrics on a labeled test corpus.
+        samples: list of (sample_input, ground_truth_label) where ground_truth is 'BENIGN' or 'MALICIOUS'.
+        Returns: confusion matrix, precision, recall, false positive rate, accuracy.
+        """
+        tp = 0
+        fp = 0
+        tn = 0
+        fn = 0
+
+        for pe_data, ground_truth in samples:
+            gt = ground_truth.upper().strip()
+            if isinstance(pe_data, dict):
+                pred = self.predict(pe_info=pe_data)
+            elif isinstance(pe_data, bytes):
+                pred = self.predict(data=pe_data)
+            elif isinstance(pe_data, Path):
+                pred = self.predict(file_path=pe_data)
+            else:
+                pred = self.predict(data=str(pe_data).encode("utf-8"))
+
+            is_mal = pred.verdict in ("MALICIOUS", "SUSPICIOUS")
+
+            if gt == "MALICIOUS":
+                if is_mal:
+                    tp += 1
+                else:
+                    fn += 1
+            else:
+                if is_mal:
+                    fp += 1
+                else:
+                    tn += 1
+
+        total = tp + fp + tn + fn
+        precision = round(tp / (tp + fp), 4) if (tp + fp) > 0 else 1.0
+        recall = round(tp / (tp + fn), 4) if (tp + fn) > 0 else 1.0
+        fpr = round(fp / (fp + tn), 4) if (fp + tn) > 0 else 0.0
+        accuracy = round((tp + tn) / total, 4) if total > 0 else 1.0
+
+        return {
+            "total_samples": total,
+            "true_positives": tp,
+            "false_positives": fp,
+            "true_negatives": tn,
+            "false_negatives": fn,
+            "confusion_matrix": {
+                "tp": tp,
+                "fp": fp,
+                "tn": tn,
+                "fn": fn,
+            },
+            "precision": precision,
+            "recall": recall,
+            "false_positive_rate": fpr,
+            "accuracy": accuracy,
+            "model_version": self.model_version,
+            "model_id": self.model_id,
+        }

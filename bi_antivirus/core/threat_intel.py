@@ -73,6 +73,8 @@ class ThreatIntelEngine:
         domain_reputations: Optional[List[str]] = None,
         publisher: str = "BI Antivirus Threat Labs",
         feed_id: str = DEFAULT_FEED_ID,
+        provenance: str = "OFFLINE_AUTHORITATIVE_LABS",
+        ttl_seconds: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Create and cryptographically sign a threat intelligence update package.
@@ -88,12 +90,15 @@ class ThreatIntelEngine:
         payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         payload_hash = hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
 
+        now_ts = int(time.time())
         manifest = {
             "feed_id": feed_id,
             "version": version,
             "sequence": sequence,
             "publisher": publisher,
-            "timestamp": int(time.time()),
+            "provenance": provenance,
+            "timestamp": now_ts,
+            "expires_at": int(now_ts + ttl_seconds) if ttl_seconds else None,
             "signatures_count": len(signatures),
             "advisories_count": len(cve_advisories),
             "payload_sha256": payload_hash,
@@ -132,6 +137,13 @@ class ThreatIntelEngine:
             logger.warning(msg)
             return False, msg
 
+        # 1.1 Expiry / TTL Freshness Validation
+        expires_at = manifest.get("expires_at")
+        if expires_at and time.time() > expires_at:
+            msg = f"Feed freshness rejection: Threat intelligence bundle expired at {expires_at}."
+            logger.warning(msg)
+            return False, msg
+
         # 2. Cryptographic HMAC Signature Verification
         manifest_canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
         expected_sig = hmac.new(
@@ -166,6 +178,15 @@ class ThreatIntelEngine:
             logger.error(msg)
             return False, msg
 
+        # 3.1 IOC Schema Validation (Validates that hashes are hexadecimal strings)
+        sigs = payload.get("signatures", [])
+        for s in sigs:
+            fh = s.get("file_hash") or s.get("hash") or ""
+            if not fh or not all(c in "0123456789abcdefABCDEF" for c in fh):
+                msg = f"Malformed IOC rejection: Invalid file hash format in signature '{s.get('threat_name', '')}'."
+                logger.error(msg)
+                return False, msg
+
         # 4. Atomic Application
         try:
             # Apply signatures to SignatureDatabase
@@ -173,7 +194,7 @@ class ThreatIntelEngine:
             if self.sig_db and hasattr(self.sig_db, "add_signature"):
                 for s in sigs:
                     self.sig_db.add_signature(
-                        file_hash=s.get("file_hash", ""),
+                        file_hash=s.get("file_hash") or s.get("hash") or "",
                         threat_name=s.get("threat_name", "UnknownThreat"),
                         threat_family=s.get("threat_family", "Trojan"),
                         severity=s.get("severity", "HIGH"),
