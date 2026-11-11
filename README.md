@@ -4,7 +4,7 @@
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-1.1.0--PRO-00b4d8.svg)](#)
 [![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-86%2F86%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-99%2F99%20PASSING-brightgreen.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
 
@@ -43,6 +43,8 @@ The primary architectural mandate is **strict non-destructive security and local
 | **Real-Time Guard (Sentinel)** | Low-overhead filesystem monitor polling critical directories (`Downloads`, `Desktop`, `Temp`) to intercept and evaluate newly dropped or modified binaries. | **VERIFIED (Active on D:)** |
 | **Web Reputation & Phishing Shield** | Local domain reputation database checking suspicious TLDs, raw IP hostnames, phishing query strings, and credential harvester patterns. | **VERIFIED (Tests Pass)** |
 | **Firewall & Network Auditor** | Read-only registry inspection of active Windows Defender Firewall profiles (Domain, Private, Public); active TCP/UDP socket auditor flagging connections to suspicious malware ports. | **VERIFIED (Passively Audited)** |
+| **Defensive Memory Exploit Shield** | Non-invasive, read-only auditing of process DEP, ASLR, CFG, Dynamic Code, and Binary Signature mitigations; bounded `VirtualQueryEx` sweep flagging RWX (`PAGE_EXECUTE_READWRITE`) and unbacked executable private pages; JIT runtime recognition; graceful OS-protected access-denied handling. | **VERIFIED (Win32 Mitigation & RWX Audit)** |
+| **Enterprise EDR Incident Graph Engine** | Cross-vector telemetry correlation linking process hierarchy (`SPAWNED`), files (`QUARANTINED`), network sockets (`CONNECTED_TO`), USB media (`MOUNTED`), and memory anomalies (`INJECTED_INTO`); evidence-backed MITRE ATT&CK mapping (`T1059.001`, `T1059.003`, `T1055`, `T1486`, `T1091`, `T1218`, `T1071.001`, `T1490`); SOC Markdown forensic reports and canonical SIEM JSON export. | **VERIFIED (MITRE ATT&CK Mapped)** |
 | **Local REST API Server** | Lightweight, multi-threaded loopback API (`127.0.0.1:8765`) enforcing constant-time token authentication (`X-BI-API-Key`), 60 req/min rate limiting, and bounded JSON payloads. | **VERIFIED (Online & Healthy)** |
 | **n8n Automation Bridge** | Dedicated localhost daemon (`127.0.0.1:5678`) translating internal threat dispatcher telemetry into sanitized webhooks with `/healthz` probing. | **VERIFIED (Online & Healthy)** |
 | **Genuine n8n Community Engine** | Official n8n Community Edition v2.46.5 installed and running on `127.0.0.1:5679` (Web UI) with separated Task Broker on `127.0.0.1:5680`. | **VERIFIED (Online & Healthy)** |

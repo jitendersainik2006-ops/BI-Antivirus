@@ -68,6 +68,36 @@ class HistoryDatabase:
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS edr_incidents (
+                    incident_id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    confidence REAL DEFAULT 0.5,
+                    root_entity TEXT,
+                    mitre_techniques TEXT,
+                    timeline_json TEXT,
+                    status TEXT DEFAULT 'ACTIVE',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS memory_audit_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pid INTEGER NOT NULL,
+                    process_name TEXT NOT NULL,
+                    dep_status TEXT,
+                    aslr_status TEXT,
+                    cfg_status TEXT,
+                    dynamic_code_status TEXT,
+                    rwx_regions_count INTEGER DEFAULT 0,
+                    risk_score INTEGER DEFAULT 0,
+                    findings TEXT,
+                    audited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     def record_scan_session(
@@ -194,3 +224,144 @@ class HistoryDatabase:
                 LIMIT ?
             """, (limit,))
             return [dict(row) for row in cursor.fetchall()]
+
+    def record_edr_incident(
+        self,
+        incident_id: str,
+        title: str,
+        severity: str,
+        confidence: float,
+        root_entity: str,
+        mitre_techniques: Any,
+        timeline: Any,
+        status: str = "ACTIVE",
+    ) -> None:
+        """Record or update a correlated EDR incident."""
+        techniques_str = json.dumps(mitre_techniques) if not isinstance(mitre_techniques, str) else mitre_techniques
+        timeline_str = json.dumps(timeline) if not isinstance(timeline, str) else timeline
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO edr_incidents (
+                    incident_id, title, severity, confidence, root_entity, mitre_techniques, timeline_json, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (incident_id, title, severity, confidence, root_entity, techniques_str, timeline_str, status))
+            conn.commit()
+
+    def get_edr_incidents(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Retrieve recent correlated EDR incidents with parsed JSON fields."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT incident_id, title, severity, confidence, root_entity, mitre_techniques, timeline_json, status, created_at
+                FROM edr_incidents
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (limit,))
+            results = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                try:
+                    item["mitre_techniques"] = json.loads(item["mitre_techniques"]) if item.get("mitre_techniques") else []
+                except Exception:
+                    pass
+                try:
+                    item["timeline"] = json.loads(item["timeline_json"]) if item.get("timeline_json") else []
+                except Exception:
+                    item["timeline"] = []
+                results.append(item)
+            return results
+
+    def get_edr_incident_by_id(self, incident_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a specific EDR incident by its unique ID."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT incident_id, title, severity, confidence, root_entity, mitre_techniques, timeline_json, status, created_at
+                FROM edr_incidents
+                WHERE incident_id = ?
+            """, (incident_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            try:
+                item["mitre_techniques"] = json.loads(item["mitre_techniques"]) if item.get("mitre_techniques") else []
+            except Exception:
+                pass
+            try:
+                item["timeline"] = json.loads(item["timeline_json"]) if item.get("timeline_json") else []
+            except Exception:
+                item["timeline"] = []
+            return item
+
+    def record_memory_audit(
+        self,
+        pid: int,
+        process_name: str,
+        dep_status: str,
+        aslr_status: str,
+        cfg_status: str,
+        dynamic_code_status: str = "UNKNOWN",
+        rwx_regions_count: int = 0,
+        risk_score: int = 0,
+        findings: Any = "",
+    ) -> int:
+        """Record a defensive process memory posture audit."""
+        findings_str = json.dumps(findings) if isinstance(findings, (list, dict)) else str(findings)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO memory_audit_events (
+                    pid, process_name, dep_status, aslr_status, cfg_status, dynamic_code_status,
+                    rwx_regions_count, risk_score, findings
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (pid, process_name, dep_status, aslr_status, cfg_status, dynamic_code_status,
+                  rwx_regions_count, risk_score, findings_str))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_recent_memory_audits(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve recent process memory audits."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, pid, process_name, dep_status, aslr_status, cfg_status, dynamic_code_status,
+                       rwx_regions_count, risk_score, findings, audited_at
+                FROM memory_audit_events
+                ORDER BY audited_at DESC
+                LIMIT ?
+            """, (limit,))
+            results = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                try:
+                    item["findings"] = json.loads(item["findings"]) if item.get("findings") else []
+                except Exception:
+                    pass
+                results.append(item)
+            return results
+
+    def get_high_risk_memory_audits(self, min_risk_score: int = 40, limit: int = 20) -> List[Dict[str, Any]]:
+        """Retrieve memory audits with risk score meeting or exceeding threshold."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, pid, process_name, dep_status, aslr_status, cfg_status, dynamic_code_status,
+                       rwx_regions_count, risk_score, findings, audited_at
+                FROM memory_audit_events
+                WHERE risk_score >= ?
+                ORDER BY audited_at DESC
+                LIMIT ?
+            """, (min_risk_score, limit))
+            results = []
+            for row in cursor.fetchall():
+                item = dict(row)
+                try:
+                    item["findings"] = json.loads(item["findings"]) if item.get("findings") else []
+                except Exception:
+                    pass
+                results.append(item)
+            return results
+

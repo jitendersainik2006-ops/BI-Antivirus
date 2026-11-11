@@ -43,6 +43,8 @@ from bi_antivirus.core.policy_engine import PolicyEngine
 from bi_antivirus.monitors.device_control import DeviceControlSentinel
 from bi_antivirus.monitors.app_control import ApplicationControlSentinel
 from bi_antivirus.monitors.encryption_manager import DiskEncryptionSentinel
+from bi_antivirus.monitors.exploit_shield import MemoryExploitShield
+from bi_antivirus.core.incident_graph import IncidentGraphEngine
 
 
 class AntivirusEngine:
@@ -134,6 +136,15 @@ class AntivirusEngine:
             on_compliance_alert=self._on_encryption_alert,
         )
 
+        # 20. Enterprise EDR Incident Graph Engine
+        self.incident_graph = IncidentGraphEngine(history_db=self.history_db)
+
+        # 21. Defensive Memory Exploit Shield
+        self.exploit_shield = MemoryExploitShield(
+            history_db=self.history_db,
+            on_exploit_threat=self._on_exploit_threat,
+        )
+
         # Live Status
         self.system_status = "PROTECTED"
         self.active_scan_thread: Optional[threading.Thread] = None
@@ -172,6 +183,10 @@ class AntivirusEngine:
         self.encryption_sentinel.start()
         self.sec_logger.log_event("INFO", "ENCRYPTION_SENTINEL", "Full Disk Encryption Sentinel started.")
 
+        # Start Defensive Memory Exploit Shield
+        self.exploit_shield.start()
+        self.sec_logger.log_event("INFO", "EXPLOIT_SHIELD", "Defensive Memory Exploit Shield active.")
+
         # Start Automated Scheduler
         self.scheduler.start()
         self.sec_logger.log_event("INFO", "SCHEDULER", "Scan Scheduler started.")
@@ -195,6 +210,7 @@ class AntivirusEngine:
         self.usb_sentinel.stop()
         self.device_control.stop()
         self.encryption_sentinel.stop()
+        self.exploit_shield.stop()
         self.scheduler.stop()
         if self.scanner.is_scanning:
             self.scanner.cancel_scan()
@@ -228,6 +244,10 @@ class AntivirusEngine:
         )
 
         self.dispatcher.emit_threat_event(threat, scan_id="REALTIME_GUARD")
+        try:
+            self.incident_graph.ingest_event("THREAT_DETECTED", threat)
+        except Exception as ig_err:
+            self.sec_logger.log_event("WARNING", "EDR_GRAPH", f"Incident correlation error: {ig_err}")
 
         if self.on_threat_found:
             try:
@@ -254,6 +274,10 @@ class AntivirusEngine:
             "description": anomaly.get("summary", ""),
         }
         self.dispatcher.emit_threat_event(threat_dict, scan_id="BEHAVIORAL")
+        try:
+            self.incident_graph.ingest_event("PROCESS_SPAWN", anomaly)
+        except Exception as ig_err:
+            self.sec_logger.log_event("WARNING", "EDR_GRAPH", f"Incident correlation error: {ig_err}")
 
         if self.on_threat_found:
             try:
@@ -280,6 +304,10 @@ class AntivirusEngine:
             "description": alert_data.get("summary", ""),
         }
         self.dispatcher.emit_threat_event(threat_dict, scan_id="RANSOMWARE_SHIELD")
+        try:
+            self.incident_graph.ingest_event("RANSOMWARE_ALERT", alert_data)
+        except Exception as ig_err:
+            self.sec_logger.log_event("WARNING", "EDR_GRAPH", f"Incident correlation error: {ig_err}")
 
         if self.on_threat_found:
             try:
@@ -299,6 +327,10 @@ class AntivirusEngine:
         )
 
         self.dispatcher.emit_threat_event(threat, scan_id="USB_SENTINEL")
+        try:
+            self.incident_graph.ingest_event("USB_DEVICE_EVENT", threat)
+        except Exception as ig_err:
+            self.sec_logger.log_event("WARNING", "EDR_GRAPH", f"Incident correlation error: {ig_err}")
 
         if self.on_threat_found:
             try:
@@ -321,6 +353,14 @@ class AntivirusEngine:
             }
             self.sec_logger.log_event("ALERT", "DEVICE_CONTROL", f"Blocked device: {event.get('drive_path')}", details=event)
             self.dispatcher.emit_threat_event(threat_dict, scan_id="DEVICE_CONTROL")
+            try:
+                self.incident_graph.ingest_event("USB_DEVICE_EVENT", {
+                    "drive_letter": event.get("drive_path"),
+                    "action": action,
+                    "threat_found": True,
+                })
+            except Exception:
+                pass
             if self.on_threat_found:
                 try:
                     self.on_threat_found(threat_dict)
@@ -347,7 +387,39 @@ class AntivirusEngine:
         }
         self.sec_logger.log_event("ALERT", "APP_CONTROL", f"Application policy violation: {violation.get('file_name')} [{status}]", details=violation)
         self.dispatcher.emit_threat_event(threat_dict, scan_id="APPLICATION_CONTROL")
+        try:
+            self.incident_graph.ingest_event("APP_CONTROL_VIOLATION", {
+                "path": violation.get("file_path"),
+                "hash": violation.get("sha256"),
+                "decision": violation.get("status"),
+                "reason": violation.get("reason"),
+            })
+        except Exception:
+            pass
         if self.on_threat_found and status == "BLOCK":
+            try:
+                self.on_threat_found(threat_dict)
+            except Exception:
+                pass
+        self._update_system_status()
+
+    def _on_exploit_threat(self, audit: Dict[str, Any]) -> None:
+        """Handle high-risk exploit/RWX memory detection from Exploit Shield."""
+        self.system_status = "THREAT_DETECTED"
+        threat_dict = {
+            "file_path": f"PID:{audit.get('pid')}:{audit.get('process_name')}",
+            "threat_name": f"ExploitShield.{audit.get('risk_level')}.MemoryAnomaly",
+            "severity": audit.get("risk_level", "HIGH"),
+            "file_hash": f"PID_{audit.get('pid')}",
+            "description": "; ".join(audit.get("findings", [])),
+        }
+        self.sec_logger.log_event("ALERT", "EXPLOIT_SHIELD", f"Memory threat flagged: {audit.get('process_name')} (PID: {audit.get('pid')})", details=audit)
+        self.dispatcher.emit_threat_event(threat_dict, scan_id="EXPLOIT_SHIELD")
+        try:
+            self.incident_graph.ingest_event("MEMORY_EXPLOIT_ALERT", audit)
+        except Exception as ig_err:
+            self.sec_logger.log_event("WARNING", "EDR_GRAPH", f"Incident correlation error: {ig_err}")
+        if self.on_threat_found:
             try:
                 self.on_threat_found(threat_dict)
             except Exception:

@@ -29,6 +29,7 @@ from bi_antivirus.ui.views.firewall_view import FirewallView
 from bi_antivirus.ui.views.automation_view import AutomationView
 from bi_antivirus.ui.views.settings_view import SettingsView
 from bi_antivirus.ui.views.reports_view import ReportsView
+from bi_antivirus.ui.views.edr_view import EDRView
 
 
 class AntivirusDashboard(tk.Tk):
@@ -111,6 +112,7 @@ class AntivirusDashboard(tk.Tk):
             ("automation", "⚡  Automation & Voice"),
             ("settings", "⚙️  Settings & Exclusions"),
             ("reports", "📊  Security Reports"),
+            ("edr", "🧠  EDR & Exploit Shield"),
         ]
 
         for key, label in nav_items:
@@ -169,6 +171,7 @@ class AntivirusDashboard(tk.Tk):
             "automation": AutomationView(self.content_area, engine=self.engine),
             "settings": SettingsView(self.content_area, engine=self.engine),
             "reports": ReportsView(self.content_area, engine=self.engine),
+            "edr": EDRView(self.content_area, engine=self.engine),
         }
 
     def _setup_engine_callbacks(self) -> None:
