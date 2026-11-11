@@ -25,6 +25,16 @@ class PrivilegeManager:
     """Manages and reports the operating privilege level and enforcement boundaries."""
 
     @staticmethod
+    def is_elevated() -> bool:
+        """Convenience method to check if process has elevated administrator privileges."""
+        return is_user_admin()
+
+    @staticmethod
+    def get_subsystem_enforcement_map() -> Dict[str, Any]:
+        """Convenience method returning the 10-subsystem privilege enforcement dictionary."""
+        return PrivilegeManager.get_enforcement_details()["features"]
+
+    @staticmethod
     def get_enforcement_details() -> Dict[str, Any]:
         """
         Returns a structured assessment of current process privileges,

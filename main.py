@@ -14,9 +14,18 @@ if str(PROJECT_DIR) not in sys.path:
     sys.path.insert(0, str(PROJECT_DIR))
 
 from bi_antivirus.config import APP_NAME, APP_VERSION
+from bi_antivirus.core.recovery_manager import CrashRecoveryManager
 
 
 def main():
+    # Automated crash detection, startup recovery & single-instance locking
+    recovery_mgr = CrashRecoveryManager()
+    recovery_report = recovery_mgr.perform_startup_recovery()
+    recovery_mgr.register_shutdown_hooks()
+
+    if recovery_report.get("previous_unclean_shutdown"):
+        print("[*] Crash Recovery: Recovered from previous unexpected termination.")
+
     # If run with command line arguments (e.g. `main.py scan --quick`, `main.py status`), route to CLI
     if len(sys.argv) > 1 and sys.argv[1] not in ("--gui", "-g"):
         from bi_antivirus.cli import main as cli_main
