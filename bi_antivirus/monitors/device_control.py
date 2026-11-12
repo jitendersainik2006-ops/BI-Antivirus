@@ -136,6 +136,17 @@ class DeviceControlSentinel:
         except Exception as e:
             logger.debug(f"Failed querying volume metadata for {drive_letter}: {e}")
 
+        # Enrich with USB hardware metadata from Windows Registry (USBSTOR)
+        try:
+            from bi_antivirus.monitors.usb_sentinel import USBSentinel
+            hw_devs = USBSentinel.get_usb_hardware_devices()
+            metadata["hardware_devices"] = hw_devs
+            if hw_devs:
+                metadata["primary_hardware_id"] = hw_devs[0].get("hardware_id", "")
+                metadata["friendly_name"] = hw_devs[0].get("friendly_name", "")
+        except Exception:
+            pass
+
         return metadata
 
     @staticmethod

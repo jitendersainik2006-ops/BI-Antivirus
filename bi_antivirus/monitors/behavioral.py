@@ -121,6 +121,34 @@ def _query_process_cmdline(pid: int) -> str:
         return ""
 
 
+def _query_process_image_path(pid: int) -> str:
+    """
+    Safely retrieves the full executable disk path using QueryFullProcessImageNameW.
+    Requires only PROCESS_QUERY_LIMITED_INFORMATION.
+    """
+    if os.name != "nt":
+        return ""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        k32 = ctypes.windll.kernel32
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        h_proc = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not h_proc:
+            return ""
+        try:
+            buf = (ctypes.c_wchar * 1024)()
+            size = wintypes.DWORD(1024)
+            if k32.QueryFullProcessImageNameW(h_proc, 0, buf, ctypes.byref(size)):
+                return buf.value
+            return ""
+        finally:
+            k32.CloseHandle(h_proc)
+    except Exception:
+        return ""
+
+
 class BehavioralMonitor:
     """Continuously audits active Windows processes for anomalous behaviors and ransomware preparation."""
 
@@ -198,6 +226,7 @@ class BehavioralMonitor:
                         while True:
                             pid = entry.th32ProcessID
                             cmdline = _query_process_cmdline(pid)
+                            exec_path = _query_process_image_path(pid)
                             processes.append({
                                 "name": entry.szExeFile.lower(),
                                 "pid": str(pid),
@@ -206,6 +235,7 @@ class BehavioralMonitor:
                                 "user": "",
                                 "title": "",
                                 "command_line": cmdline,
+                                "executable_path": exec_path,
                             })
                             if not k32.Process32NextW(h_snap, ctypes.byref(entry)):
                                 break

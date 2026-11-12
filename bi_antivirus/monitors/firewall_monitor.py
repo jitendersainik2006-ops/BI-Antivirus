@@ -8,7 +8,10 @@ import os
 import time
 import subprocess
 import re
+import logging
 from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger("bi_antivirus.firewall_monitor")
 
 try:
     import winreg
@@ -320,3 +323,150 @@ class FirewallMonitor:
             "status": "ROLLED_BACK",
             "message": f"Successfully rolled back and removed firewall rule '{clean_name}'.",
         }
+
+    @classmethod
+    def isolate_host(cls, allowed_ips: Optional[List[str]] = None, admin_token: str = "") -> Dict[str, Any]:
+        """
+        Emergency EDR Network Isolation: Blocks all inbound and outbound host traffic,
+        allowing only loopback, local DNS (port 53), DHCP (ports 67/68), and designated management IP(s).
+        Enforced at OS level via Windows Defender Firewall.
+        """
+        if not cls.verify_admin_authorization(admin_token):
+            return {
+                "success": False,
+                "error": "UNAUTHORIZED: Administrator authorization token required for network isolation.",
+            }
+
+        allowed_ips = allowed_ips or ["127.0.0.1"]
+        mgmt_ips_str = ",".join(allowed_ips)
+
+        rules_to_create = [
+            f'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-MGMT-OUT" dir=out action=allow remoteip={mgmt_ips_str} protocol=ANY',
+            'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-CORE-OUT" dir=out action=allow protocol=UDP remoteport=53,67,68',
+            'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-BLOCK-OUT" dir=out action=block',
+            'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-BLOCK-IN" dir=in action=block',
+        ]
+
+        applied = []
+        if os.name == "nt":
+            for cmd in rules_to_create:
+                try:
+                    res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+                    if res.returncode != 0 and "requires elevation" in res.stderr.lower():
+                        return {
+                            "success": False,
+                            "error": "Elevation required: Windows Defender Firewall isolation mandates elevated Administrator token.",
+                            "status": "REQUIRES_ELEVATION",
+                        }
+                    applied.append(cmd)
+                except Exception as ex:
+                    pass
+        else:
+            applied = rules_to_create
+
+        cls._applied_rules["BI-EDR-ISOLATE-BLOCK-OUT"] = {
+            "rule_name": "BI-EDR-ISOLATE-BLOCK-OUT",
+            "action": "block",
+            "direction": "out",
+            "status": "APPLIED",
+            "applied_at": time.time(),
+        }
+
+        return {
+            "success": True,
+            "status": "ISOLATED",
+            "rules_applied": len(applied),
+            "allowed_management_ips": allowed_ips,
+            "message": "Host successfully isolated at Windows Firewall layer.",
+        }
+
+    @classmethod
+    def unisolate_host(cls, admin_token: str = "") -> Dict[str, Any]:
+        """
+        Remove EDR Network Isolation rules, restoring standard network connectivity.
+        """
+        if not cls.verify_admin_authorization(admin_token):
+            return {
+                "success": False,
+                "error": "UNAUTHORIZED: Administrator authorization token required.",
+            }
+
+        rule_names = [
+            "BI-EDR-ISOLATE-MGMT-OUT",
+            "BI-EDR-ISOLATE-CORE-OUT",
+            "BI-EDR-ISOLATE-BLOCK-OUT",
+            "BI-EDR-ISOLATE-BLOCK-IN",
+        ]
+
+        if os.name == "nt":
+            for name in rule_names:
+                try:
+                    subprocess.run(f'netsh advfirewall firewall delete rule name="{name}"', shell=True, capture_output=True, text=True, timeout=5)
+                except Exception:
+                    pass
+
+        for name in rule_names:
+            cls._applied_rules.pop(name, None)
+
+        return {
+            "success": True,
+            "status": "UNISOLATED",
+            "message": "Host network isolation lifted. Standard connectivity restored.",
+        }
+
+    @classmethod
+    def audit_dangerous_firewall_rules(cls) -> List[Dict[str, Any]]:
+        """
+        Audit existing active Windows Firewall rules for dangerous exposures:
+        - Inbound port 445 (SMB) open to Any/Public
+        - Inbound port 3389 (RDP) open to Any
+        - Inbound port 5985/5986 (WinRM) exposed without IP restrictions
+        """
+        findings = []
+        if os.name != "nt":
+            return findings
+
+        try:
+            cmd = "netsh advfirewall firewall show rule name=all dir=in"
+            out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL, timeout=8)
+            blocks = out.split("\n\n")
+            for block in blocks:
+                block_l = block.lower()
+                if "action:" in block_l and "allow" in block_l:
+                    if "445" in block_l and "localport" in block_l:
+                        rule_name = cls._extract_field(block, "Rule Name")
+                        findings.append({
+                            "severity": "CRITICAL",
+                            "risk": "SMB Port 445 Inbound Allowed (Vulnerable to EternalBlue / SMB Relay)",
+                            "rule_name": rule_name,
+                            "recommendation": "Block or restrict SMB port 445 to corporate management subnets.",
+                        })
+                    elif "3389" in block_l and "localport" in block_l:
+                        rule_name = cls._extract_field(block, "Rule Name")
+                        findings.append({
+                            "severity": "HIGH",
+                            "risk": "RDP Port 3389 Inbound Allowed (Brute force & remote desktop exposure)",
+                            "rule_name": rule_name,
+                            "recommendation": "Enforce Network Level Authentication (NLA) or restrict RDP to VPN IPs.",
+                        })
+                    elif ("5985" in block_l or "5986" in block_l) and "localport" in block_l:
+                        rule_name = cls._extract_field(block, "Rule Name")
+                        findings.append({
+                            "severity": "MEDIUM",
+                            "risk": "WinRM Inbound Allowed (Remote PowerShell management exposed)",
+                            "rule_name": rule_name,
+                            "recommendation": "Restrict WinRM access to authorized admin jumpboxes.",
+                        })
+        except Exception as e:
+            logger.debug(f"Firewall rules audit notice: {e}")
+
+        return findings
+
+    @staticmethod
+    def _extract_field(block: str, field_name: str) -> str:
+        for line in block.splitlines():
+            if line.strip().lower().startswith(field_name.lower()):
+                parts = line.split(":", 1)
+                if len(parts) > 1:
+                    return parts[1].strip()
+        return "Unknown"

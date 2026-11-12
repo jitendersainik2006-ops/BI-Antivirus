@@ -147,6 +147,8 @@ class RealTimeGuard:
         self.events_processed = 0
         self.threats_detected = 0
         self.suppressed_self_events = 0
+        self._watcher_threads: List[threading.Thread] = []
+        self.win32_watchers_active: int = 0
 
         # Self-event suppression prefixes
         self._suppressed_prefixes = [
@@ -217,7 +219,9 @@ class RealTimeGuard:
 
         self._worker_thread = threading.Thread(target=self._monitor_loop, daemon=True, name="BI-RealTimeGuard")
         self._worker_thread.start()
-        logger.info(f"Real-Time Guard active, monitoring {len(self.monitored_paths)} folders ({len(self.priority_paths)} priority).")
+        if os.name == "nt":
+            self._start_win32_watchers()
+        logger.info(f"Real-Time Guard active, monitoring {len(self.monitored_paths)} folders ({len(self.priority_paths)} priority, {self.win32_watchers_active} Win32 watchers).")
         return True
 
     def pause(self) -> bool:
@@ -244,8 +248,137 @@ class RealTimeGuard:
         self.state = ProtectionState.STOPPED
         self._stop_event.set()
         if self._worker_thread and self._worker_thread.is_alive():
-            self._worker_thread.join(timeout=2.0)
+            self._worker_thread.join(timeout=1.0)
+        self._watcher_threads.clear()
+        self.win32_watchers_active = 0
         logger.info("Real-Time Guard stopped.")
+
+    @staticmethod
+    def read_zone_identifier(file_path: Path) -> Optional[Dict[str, Any]]:
+        """
+        Inspect NTFS Zone.Identifier Alternate Data Stream (ADS) for internet ingress metadata.
+        ZoneId:
+          0 = Local Machine
+          1 = Intranet
+          2 = Trusted Sites
+          3 = Internet (Untrusted download)
+          4 = Restricted Sites
+        """
+        if os.name != "nt":
+            return None
+        ads_path = Path(str(file_path) + ":Zone.Identifier")
+        try:
+            if not ads_path.exists():
+                return None
+            content = ads_path.read_text(encoding="utf-8", errors="ignore")
+            zone_id = 0
+            host_url = ""
+            referrer_url = ""
+            for line in content.splitlines():
+                line = line.strip()
+                if line.startswith("ZoneId="):
+                    try:
+                        zone_id = int(line.split("=", 1)[1])
+                    except ValueError:
+                        pass
+                elif line.startswith("HostUrl="):
+                    host_url = line.split("=", 1)[1]
+                elif line.startswith("ReferrerUrl="):
+                    referrer_url = line.split("=", 1)[1]
+
+            return {
+                "zone_id": zone_id,
+                "is_untrusted": zone_id >= 3,
+                "host_url": host_url,
+                "referrer_url": referrer_url,
+                "raw": content,
+            }
+        except Exception:
+            return None
+
+    def _start_win32_watchers(self) -> None:
+        """Spawn asynchronous Win32 ReadDirectoryChangesW listener threads for priority folders."""
+        if os.name != "nt":
+            return
+        self._watcher_threads.clear()
+        target_dirs = self.priority_paths or self.monitored_paths[:3]
+        for p_dir in target_dirs:
+            if p_dir.exists() and p_dir.is_dir():
+                t = threading.Thread(
+                    target=self._watch_directory_win32,
+                    args=(p_dir,),
+                    daemon=True,
+                    name=f"BI-Win32Watcher-{p_dir.name}",
+                )
+                self._watcher_threads.append(t)
+                t.start()
+        self.win32_watchers_active = len(self._watcher_threads)
+
+    def _watch_directory_win32(self, dir_path: Path) -> None:
+        """Event-driven Win32 ReadDirectoryChangesW notification loop."""
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+            k32 = ctypes.windll.kernel32
+
+            FILE_LIST_DIRECTORY = 0x0001
+            FILE_SHARE_READ = 0x00000001
+            FILE_SHARE_WRITE = 0x00000002
+            FILE_SHARE_DELETE = 0x00000004
+            OPEN_EXISTING = 3
+            FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+            filter_flags = 0x00000001 | 0x00000008 | 0x00000010  # FILE_NAME | SIZE | LAST_WRITE
+
+            h_dir = k32.CreateFileW(
+                str(dir_path),
+                FILE_LIST_DIRECTORY,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                None,
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS,
+                None,
+            )
+            if h_dir == -1 or not h_dir:
+                return
+
+            buf = ctypes.create_string_buffer(8192)
+            bytes_ret = wintypes.DWORD(0)
+
+            while not self._stop_event.is_set() and self.is_running:
+                success = k32.ReadDirectoryChangesW(
+                    h_dir,
+                    buf,
+                    len(buf),
+                    True,  # bWatchSubtree
+                    filter_flags,
+                    ctypes.byref(bytes_ret),
+                    None,
+                    None,
+                )
+                if not success or bytes_ret.value == 0:
+                    break
+
+                offset = 0
+                while offset < bytes_ret.value:
+                    next_off = int.from_bytes(buf[offset:offset+4], "little")
+                    name_len = int.from_bytes(buf[offset+8:offset+12], "little")
+                    name_raw = buf[offset+12:offset+12+name_len]
+                    try:
+                        rel = name_raw.decode("utf-16le")
+                        target = dir_path / rel
+                        if target.is_file() and not self._is_self_event(target):
+                            st = target.stat()
+                            self._enqueue_event(target, st.st_mtime, st.st_size)
+                    except Exception:
+                        pass
+                    if next_off == 0:
+                        break
+                    offset += next_off
+            k32.CloseHandle(h_dir)
+        except Exception as e:
+            logger.debug(f"Win32 ReadDirectoryChangesW loop exited for {dir_path}: {e}")
 
     def _build_baseline(self) -> None:
         """Snapshot current directory files so only new/modified files trigger scans."""
@@ -380,17 +513,26 @@ class RealTimeGuard:
             result = self.detector.analyze_file(file_path)
             is_threat = result.get("is_threat", False)
 
-            # Optional local ML static evaluation for PE binaries
-            if not is_threat and file_path.suffix.lower() in (".exe", ".dll", ".sys"):
+            # Ingress Zone.Identifier Alternate Data Stream (ADS) inspection
+            zone_info = self.read_zone_identifier(file_path)
+            if zone_info and zone_info.get("is_untrusted"):
+                result["zone_transfer"] = zone_info
+                result["untrusted_ingress"] = True
+
+            # Static ML evaluation for PE binaries or untrusted internet downloads
+            ext = file_path.suffix.lower()
+            if not is_threat and (ext in (".exe", ".dll", ".sys") or (zone_info and zone_info.get("is_untrusted") and ext in (".bat", ".cmd", ".ps1", ".vbs", ".js", ".hta", ".scr"))):
                 try:
                     ml_pred = self.ml_engine.predict(file_path=file_path)
-                    if ml_pred.verdict == "MALICIOUS":
+                    prob_threshold = 0.65 if (zone_info and zone_info.get("is_untrusted")) else 0.85
+                    if ml_pred.verdict in ("MALICIOUS", "SUSPICIOUS") or ml_pred.probability >= prob_threshold:
                         is_threat = True
                         result["is_threat"] = True
-                        result["threat_name"] = f"ML.Heuristics.SuspiciousPE.{ml_pred.model_version}"
+                        tag = "UntrustedIngress" if (zone_info and zone_info.get("is_untrusted")) else "SuspiciousPE"
+                        result["threat_name"] = f"ML.Heuristics.{tag}.{ml_pred.model_version}"
                         result["threat_family"] = "MachineLearning"
                         result["severity"] = "HIGH"
-                        result["description"] = f"Local ML inference flagged executable (prob={ml_pred.probability:.2f})"
+                        result["description"] = f"Local ML inference flagged file (prob={ml_pred.probability:.2f}, zone={zone_info.get('zone_id') if zone_info else 'Local'})"
                 except Exception as ex:
                     logger.debug(f"Real-time ML evaluation skipped: {ex}")
 
@@ -442,6 +584,7 @@ class RealTimeGuard:
             "state": self.state,
             "monitored_paths_count": len(self.monitored_paths),
             "priority_paths_count": len(self.priority_paths),
+            "win32_watchers_active": getattr(self, "win32_watchers_active", 0),
             "events_processed": self.events_processed,
             "threats_detected": self.threats_detected,
             "suppressed_self_events": self.suppressed_self_events,
@@ -460,6 +603,7 @@ class RealTimeGuard:
             "last_scan_timestamp": self.last_scan_time,
             "monitored_paths_count": len(self.monitored_paths),
             "priority_paths_count": len(self.priority_paths),
+            "win32_watchers_active": getattr(self, "win32_watchers_active", 0),
             "events_processed": self.events_processed,
             "threats_detected": self.threats_detected,
             "suppressed_self_events": self.suppressed_self_events,

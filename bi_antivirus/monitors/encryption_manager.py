@@ -19,6 +19,10 @@ import logging
 import threading
 from typing import Dict, Any, List, Optional, Callable
 
+if os.name == "nt":
+    import winreg
+    import ctypes
+
 from bi_antivirus.config import (
     SEVERITY_CRITICAL,
     SEVERITY_HIGH,
@@ -49,7 +53,140 @@ class DiskEncryptionSentinel:
         self._worker_thread: Optional[threading.Thread] = None
 
         self._last_audit_results: List[Dict[str, Any]] = []
+        self._last_tpm_status: Dict[str, Any] = {}
+        self._last_os_edition: Dict[str, Any] = {}
         self._lock = threading.RLock()
+
+    @staticmethod
+    def audit_windows_edition() -> Dict[str, Any]:
+        """
+        Query Windows SKU edition to identify BitLocker vs Device Encryption capability.
+        Windows Pro and Enterprise support full BitLocker; Windows Home supports Device Encryption.
+        """
+        edition_info = {
+            "edition_id": "Unknown",
+            "product_name": "Windows",
+            "build_number": "",
+            "is_enterprise_or_pro": False,
+            "bitlocker_supported": False,
+            "device_encryption_supported": True,
+            "notes": "Full BitLocker enterprise policy management requires Windows Pro or Enterprise.",
+        }
+        if os.name != "nt":
+            return edition_info
+
+        try:
+            k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
+            try:
+                edition_info["edition_id"] = str(winreg.QueryValueEx(k, "EditionID")[0])
+            except Exception:
+                pass
+            try:
+                edition_info["product_name"] = str(winreg.QueryValueEx(k, "ProductName")[0])
+            except Exception:
+                pass
+            try:
+                edition_info["build_number"] = str(winreg.QueryValueEx(k, "CurrentBuild")[0])
+            except Exception:
+                pass
+            winreg.CloseKey(k)
+
+            eid = edition_info["edition_id"].lower()
+            if any(tok in eid for tok in ["pro", "enterprise", "education", "server"]):
+                edition_info["is_enterprise_or_pro"] = True
+                edition_info["bitlocker_supported"] = True
+                edition_info["notes"] = "Full BitLocker management is supported on this Windows SKU."
+            else:
+                edition_info["is_enterprise_or_pro"] = False
+                edition_info["bitlocker_supported"] = False
+                edition_info["notes"] = (
+                    f"Windows SKU '{edition_info['edition_id']}' operates Device Encryption; "
+                    "enterprise centralized BitLocker management requires Windows Pro or Enterprise."
+                )
+        except Exception as e:
+            logger.debug(f"Failed querying Windows edition: {e}")
+
+        return edition_info
+
+    @staticmethod
+    def audit_tpm_chip() -> Dict[str, Any]:
+        """
+        Audit hardware TPM 2.0 presence, readiness, and manufacturer details via kernel services registry.
+        Operates without elevation or WMI permission failures.
+        """
+        tpm_info = {
+            "tpm_present": False,
+            "tpm_ready": False,
+            "spec_version": "Unknown",
+            "manufacturer_id": "Unknown",
+            "manufacturer_name": "Unknown",
+            "firmware_version": "Unknown",
+            "storage_ready": False,
+            "attestation_ready": False,
+            "backed_device_id": False,
+        }
+        if os.name != "nt":
+            return tpm_info
+
+        try:
+            # Check TPM WMI configuration in Services
+            try:
+                k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\TPM\WMI")
+                tpm_info["tpm_present"] = True
+                tpm_info["spec_version"] = "2.0"  # Modern Windows 10/11 services use TPM 2.0
+
+                try:
+                    tpm_info["firmware_version"] = str(winreg.QueryValueEx(k, "TaskFirmwareVersion")[0])
+                except Exception:
+                    pass
+
+                try:
+                    mfg_raw = int(winreg.QueryValueEx(k, "TaskManufacturerId")[0])
+                    mfg_bytes = mfg_raw.to_bytes(4, "big")
+                    mfg_str = mfg_bytes.decode("ascii", errors="replace").strip("\x00")
+                    tpm_info["manufacturer_id"] = mfg_str
+                    mfg_map = {
+                        "INTC": "Intel Platform Trust Technology (PTT)",
+                        "AMD": "AMD Platform Security Processor (PSP)",
+                        "IFX": "Infineon Technologies TPM",
+                        "MSFT": "Microsoft Software TPM",
+                        "NTC": "Nuvoton Technology",
+                        "STM": "STMicroelectronics",
+                    }
+                    tpm_info["manufacturer_name"] = mfg_map.get(mfg_str, f"Hardware TPM ({mfg_str})")
+                except Exception:
+                    pass
+
+                try:
+                    r_storage = int(winreg.QueryValueEx(k, "TaskReadyForStorage")[0]) == 1
+                    tpm_info["storage_ready"] = r_storage
+                except Exception:
+                    r_storage = False
+
+                try:
+                    r_attest = int(winreg.QueryValueEx(k, "TaskReadyForAttestation")[0]) == 1
+                    tpm_info["attestation_ready"] = r_attest
+                except Exception:
+                    r_attest = False
+
+                try:
+                    tpm_info["backed_device_id"] = int(winreg.QueryValueEx(k, "TpmBackedDeviceID")[0]) == 1
+                except Exception:
+                    pass
+
+                tpm_info["tpm_ready"] = bool(r_storage or r_attest)
+                winreg.CloseKey(k)
+            except FileNotFoundError:
+                # Fallback: check if TPM driver service is registered
+                k_drv = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\TPM")
+                tpm_info["tpm_present"] = True
+                tpm_info["spec_version"] = "1.2/2.0"
+                tpm_info["manufacturer_name"] = "Windows TPM Driver Present"
+                winreg.CloseKey(k_drv)
+        except Exception as e:
+            logger.debug(f"TPM hardware audit failed or TPM not available: {e}")
+
+        return tpm_info
 
     @staticmethod
     def audit_volumes_via_manage_bde() -> List[Dict[str, Any]]:
@@ -155,24 +292,69 @@ class DiskEncryptionSentinel:
         """
         Execute full encryption posture audit, record compliance findings, and notify listeners.
         """
+        os_edition = self.audit_windows_edition()
+        tpm_info = self.audit_tpm_chip()
         volumes = self.audit_volumes_via_manage_bde()
 
         # Fallback if manage-bde returned nothing (e.g., Windows Home edition or non-admin)
         if not volumes and os.name == "nt":
-            # Provide baseline assessment of system drive
-            volumes = [{
-                "drive_letter": "C:\\",
-                "size_gb": 0.0,
-                "bitlocker_version": "Windows BitLocker",
-                "conversion_status": "Audit Restricted / Unencrypted",
-                "percentage_encrypted": 0,
-                "encryption_method": "Unknown",
-                "protection_status": "Protection Off or Windows Home Edition",
-                "lock_status": "Unlocked",
-                "key_protectors": [],
-                "is_compliant": False,
-                "compliance_severity": SEVERITY_MEDIUM,
-            }]
+            volumes = []
+            try:
+                bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+                for i in range(26):
+                    if (bitmask >> i) & 1:
+                        dl = f"{chr(65 + i)}:\\"
+                        dtype = ctypes.windll.kernel32.GetDriveTypeW(dl)
+                        if dtype == 3:  # DRIVE_FIXED
+                            total_gb = 0.0
+                            try:
+                                free = ctypes.c_ulonglong()
+                                total = ctypes.c_ulonglong()
+                                total_free = ctypes.c_ulonglong()
+                                if ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+                                    dl, ctypes.byref(free), ctypes.byref(total), ctypes.byref(total_free)
+                                ):
+                                    total_gb = round(total.value / (1024**3), 2)
+                            except Exception:
+                                pass
+
+                            is_pro = os_edition.get("is_enterprise_or_pro", False)
+                            status_desc = (
+                                "Device Encryption / Unmanaged (Windows Home SKU)"
+                                if not is_pro
+                                else "Restricted Audit (Requires Elevation)"
+                            )
+                            volumes.append({
+                                "drive_letter": dl,
+                                "size_gb": total_gb,
+                                "bitlocker_version": "BitLocker / Device Encryption" if tpm_info.get("tpm_present") else "None",
+                                "conversion_status": status_desc,
+                                "percentage_encrypted": 0.0,
+                                "encryption_method": "XTS-AES (Hardware)" if tpm_info.get("tpm_present") else "None",
+                                "protection_status": "Protection Off / Unmanaged",
+                                "lock_status": "Unlocked",
+                                "key_protectors": ["TPM 2.0 (Detected)"] if tpm_info.get("tpm_ready") else [],
+                                "is_compliant": False,
+                                "compliance_severity": SEVERITY_MEDIUM,
+                            })
+            except Exception as e:
+                logger.debug(f"Win32 drive enumeration fallback failed: {e}")
+
+            if not volumes:
+                # Minimum baseline fallback
+                volumes = [{
+                    "drive_letter": "C:\\",
+                    "size_gb": 0.0,
+                    "bitlocker_version": "Windows BitLocker",
+                    "conversion_status": "Audit Restricted / Unencrypted",
+                    "percentage_encrypted": 0,
+                    "encryption_method": "Unknown",
+                    "protection_status": "Protection Off or Windows Home Edition",
+                    "lock_status": "Unlocked",
+                    "key_protectors": [],
+                    "is_compliant": False,
+                    "compliance_severity": SEVERITY_MEDIUM,
+                }]
 
         total_vols = len(volumes)
         protected_vols = sum(1 for v in volumes if v.get("is_compliant", False))
@@ -183,6 +365,8 @@ class DiskEncryptionSentinel:
             "protected_volumes": protected_vols,
             "unprotected_volumes": total_vols - protected_vols,
             "overall_compliant": overall_compliant,
+            "windows_edition": os_edition,
+            "tpm_posture": tpm_info,
             "volumes": volumes,
         }
 
@@ -212,6 +396,8 @@ class DiskEncryptionSentinel:
 
         with self._lock:
             self._last_audit_results = volumes
+            self._last_tpm_status = tpm_info
+            self._last_os_edition = os_edition
 
         logger.info(f"Disk Encryption audit completed: {protected_vols}/{total_vols} volumes protected.")
         return audit_summary
@@ -222,6 +408,20 @@ class DiskEncryptionSentinel:
             if not self._last_audit_results:
                 self.run_compliance_audit()
             return list(self._last_audit_results)
+
+    def get_tpm_status(self) -> Dict[str, Any]:
+        """Return cached TPM 2.0 posture."""
+        with self._lock:
+            if not self._last_tpm_status:
+                self.run_compliance_audit()
+            return dict(self._last_tpm_status)
+
+    def get_os_edition(self) -> Dict[str, Any]:
+        """Return cached Windows Edition info."""
+        with self._lock:
+            if not self._last_os_edition:
+                self.run_compliance_audit()
+            return dict(self._last_os_edition)
 
     def start(self) -> None:
         """Start periodic disk encryption auditing."""

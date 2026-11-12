@@ -8,6 +8,7 @@ Safely inspects URLs without fetching or executing remote untrusted payloads.
 import re
 import ipaddress
 import urllib.parse
+from pathlib import Path
 from typing import Dict, Any, Optional, List, Set
 from bi_antivirus.config import (
     SEVERITY_CRITICAL,
@@ -111,6 +112,23 @@ class WebProtection:
         if ext in {"exe", "scr", "vbs", "ps1", "bat", "hta", "pif"}:
             risk_score += 45
             reasons.append(f"URL directly links to executable download: .{ext}")
+
+        # Check 2.5: IDN / Punycode Homograph Spoofing
+        if "xn--" in host:
+            risk_score += 55
+            reasons.append("IDN Punycode homograph domain detected (potential brand spoofing)")
+
+        # Check 2.6: DGA / High-Entropy Subdomain Detection
+        parts = host.split(".")
+        if len(parts) >= 2:
+            main_label = parts[0]
+            if len(main_label) >= 12 and not IP_HOST_PATTERN.match(host):
+                # Count vowels vs consonants
+                vowels = sum(1 for c in main_label if c in "aeiou")
+                consonants = sum(1 for c in main_label if c.isalpha() and c not in "aeiou")
+                if vowels == 0 or (consonants > 0 and consonants / max(vowels, 1) >= 4.5):
+                    risk_score += 40
+                    reasons.append(f"Algorithmic Domain Generation (DGA) pattern detected in label '{main_label}'")
 
         if risk_score >= 70:
             return {
@@ -265,4 +283,35 @@ class WebProtection:
             "category": "Clean",
             "severity": SEVERITY_CLEAN,
             "is_blocked": False,
+        }
+
+    @staticmethod
+    def audit_hosts_file_sinkholes() -> Dict[str, Any]:
+        """
+        Audit the Windows hosts file (read-only) for active DNS sinkhole redirections
+        (e.g., malicious domains mapped to 0.0.0.0 or 127.0.0.1).
+        """
+        hosts_path = Path(r"C:\Windows\System32\drivers\etc\hosts")
+        sinkholes: List[Dict[str, str]] = []
+        if not hosts_path.exists():
+            return {"hosts_file_found": False, "sinkhole_count": 0, "sinkholes": []}
+
+        try:
+            with open(hosts_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line_str = line.strip()
+                    if not line_str or line_str.startswith("#"):
+                        continue
+                    parts = line_str.split()
+                    if len(parts) >= 2:
+                        ip_target, domain = parts[0], parts[1]
+                        if ip_target in {"0.0.0.0", "127.0.0.1"} and domain.lower() not in {"localhost", "broadcasthost"}:
+                            sinkholes.append({"ip": ip_target, "domain": domain})
+        except Exception:
+            pass
+
+        return {
+            "hosts_file_found": True,
+            "sinkhole_count": len(sinkholes),
+            "sinkholes": sinkholes[:50],
         }

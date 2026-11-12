@@ -89,6 +89,58 @@ class USBSentinel:
 
         return drives
 
+    @staticmethod
+    def get_usb_hardware_devices() -> List[Dict[str, Any]]:
+        """
+        Extract genuine USB storage hardware metadata (Vendor, Product, Hardware ID, Serial)
+        directly from the Windows Registry (HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR).
+        Provides robust, non-admin read-only hardware discovery without WMI permissions issues.
+        """
+        if os.name != "nt":
+            return []
+
+        devices = []
+        try:
+            import winreg
+            base_key = r"SYSTEM\CurrentControlSet\Enum\USBSTOR"
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, base_key) as k_base:
+                device_count = winreg.QueryInfoKey(k_base)[0]
+                for i in range(device_count):
+                    try:
+                        dev_subkey = winreg.EnumKey(k_base, i)
+                        with winreg.OpenKey(k_base, dev_subkey) as k_dev:
+                            inst_count = winreg.QueryInfoKey(k_dev)[0]
+                            for j in range(inst_count):
+                                try:
+                                    inst_subkey = winreg.EnumKey(k_dev, j)
+                                    with winreg.OpenKey(k_dev, inst_subkey) as k_inst:
+                                        friendly_name = ""
+                                        hw_ids = []
+                                        try:
+                                            friendly_name, _ = winreg.QueryValueEx(k_inst, "FriendlyName")
+                                        except Exception:
+                                            friendly_name = dev_subkey.replace("Disk&Ven_", "").replace("&Prod_", " ")
+                                        try:
+                                            hw_ids, _ = winreg.QueryValueEx(k_inst, "HardwareID")
+                                        except Exception:
+                                            hw_ids = [dev_subkey]
+
+                                        devices.append({
+                                            "device_key": dev_subkey,
+                                            "friendly_name": friendly_name,
+                                            "serial_number": inst_subkey.split("&")[0],
+                                            "hardware_id": hw_ids[0] if hw_ids else dev_subkey,
+                                            "all_hardware_ids": list(hw_ids) if isinstance(hw_ids, (list, tuple)) else [str(hw_ids)],
+                                        })
+                                except Exception:
+                                    continue
+                    except Exception:
+                        continue
+        except Exception as e:
+            logger.debug(f"USBSTOR registry query notice: {e}")
+
+        return devices
+
     @classmethod
     def audit_drive_root(cls, drive_path: str) -> Dict[str, Any]:
         """
@@ -137,6 +189,20 @@ class USBSentinel:
                     ext = entry.suffix.lower()
                     if ext == ".lnk":
                         lnk_count += 1
+                        # Inspect LNK raw bytes for embedded command interpreter payloads
+                        try:
+                            raw_b = entry.read_bytes()[:2048].lower()
+                            if any(k in raw_b for k in (b"powershell", b"cmd.exe", b"mshta", b"certutil", b"wscript", b"cscript")):
+                                is_threat = True
+                                risk_score += 95
+                                threats_found.append({
+                                    "file_path": str(entry),
+                                    "threat_name": "Worm.Removable.MaliciousLNKPayload",
+                                    "severity": SEVERITY_CRITICAL,
+                                    "description": f"Shortcut '{entry.name}' contains embedded command interpreter launch sequence.",
+                                })
+                        except Exception:
+                            pass
                     elif ext in (".exe", ".scr", ".vbs", ".bat", ".cmd", ".pif"):
                         # Check if hidden
                         if entry.name.startswith("."):
@@ -148,6 +214,32 @@ class USBSentinel:
                                     hidden_exe_count += 1
                             except Exception:
                                 pass
+
+                    # Check for BadUSB / Rubber Ducky keystroke injection scripts
+                    name_l = entry.name.lower()
+                    if name_l in ("inject.bin", "payload.dd", "ducky.txt") or name_l.endswith(".ducky"):
+                        is_threat = True
+                        risk_score += 90
+                        threats_found.append({
+                            "file_path": str(entry),
+                            "threat_name": "Exploit.BadUSB.DuckyScriptPayload",
+                            "severity": SEVERITY_CRITICAL,
+                            "description": f"Removable media contains BadUSB / Rubber Ducky hardware payload '{entry.name}'.",
+                        })
+                    elif ext in (".txt", ".ini", ".cfg"):
+                        try:
+                            head = entry.read_text(encoding="utf-8", errors="ignore")[:300].upper()
+                            if head.startswith("REM ") and any(k in head for k in ("DELAY ", "STRING ", "GUI R", "ENTER")):
+                                is_threat = True
+                                risk_score += 90
+                                threats_found.append({
+                                    "file_path": str(entry),
+                                    "threat_name": "Exploit.BadUSB.DuckyScriptPayload",
+                                    "severity": SEVERITY_CRITICAL,
+                                    "description": f"Removable media file '{entry.name}' contains Rubber Ducky keystroke injection script.",
+                                })
+                        except Exception:
+                            pass
 
             # Pattern: Shortcut worm replaces folders with .lnk files
             if lnk_count >= 3 and len(entries) > 0 and (lnk_count / len(entries)) > 0.4:
