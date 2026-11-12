@@ -9,7 +9,7 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 from typing import Callable, Optional
 
-from bi_antivirus.config import THEME, APP_NAME, APP_SUBTITLE
+from bi_antivirus.config import THEME, APP_NAME, APP_SUBTITLE, DATA_DIR
 from bi_antivirus.ui.widgets.cards import StatusShield, StatCard, ActionCard
 
 
@@ -473,7 +473,7 @@ class OverviewView(tk.Frame):
         btn_box.pack(fill="x")
 
         def _export():
-            out_p = Path(r"D:\bit defender\data\system_diagnostics.json")
+            out_p = DATA_DIR / "system_diagnostics.json"
             with open(out_p, "w", encoding="utf-8") as f:
                 json.dump(report, f, indent=2)
             messagebox.showinfo("Export Diagnostics", f"Diagnostic report exported to:\n{out_p}")

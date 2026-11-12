@@ -8,10 +8,18 @@ from pathlib import Path
 import os
 import json
 
-# Base Project Path on D: Drive (Canonical Workspace Root)
-PROJECT_ROOT = Path(r"D:\bit defender").resolve()
-if not PROJECT_ROOT.exists():
-    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Base Project Path (Dynamically Resolved with D: Drive Canonical Fallback)
+_ENV_ROOT = os.environ.get("BI_PROJECT_ROOT")
+if _ENV_ROOT and Path(_ENV_ROOT).exists():
+    PROJECT_ROOT = Path(_ENV_ROOT).resolve()
+else:
+    _detected = Path(__file__).resolve().parent.parent
+    if (_detected / "bi_antivirus").exists():
+        PROJECT_ROOT = _detected
+    elif Path(r"D:\bit defender").exists():
+        PROJECT_ROOT = Path(r"D:\bit defender").resolve()
+    else:
+        PROJECT_ROOT = _detected
 
 # Dedicated Storage Directories on D: Drive
 DATA_DIR = PROJECT_ROOT / "data"

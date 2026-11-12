@@ -135,3 +135,11 @@ For sovereign defense, banking, and critical infrastructure environments that fo
 | **DDoS on Central Query Gateways** | Critical | Cloudflare / Fastly Anycast edge routing with automated rate-limiting, SYN-flood absorption, and edge token verification. |
 | **Poisoning of Threat Intelligence Feeds** | High | Multi-source corroboration consensus (requires agreement from $\ge 2$ trusted sources before auto-blocking); manual analyst review trigger for high-volume binaries. |
 | **Outdated Edge Cache Serving Stale Allow** | Medium | Event-driven cache invalidation via Redis Pub/Sub; critical threat declarations broadcast globally within 1.5 seconds. |
+
+---
+
+## 9. Engineering Dependencies, Specialist Skills & Operational Boundary
+
+- **Infrastructure Requirements:** Multi-region active-active distributed database cluster (Redis Enterprise, ScyllaDB, Neo4j Graph DB) behind global Anycast edge network.
+- **Specialist Capabilities Required:** Threat intelligence analysts, distributed systems engineers, graph database architects, cryptography engineers.
+- **Scope Distinction:** This document specifies an external global cloud threat intelligence network. The current BI Antivirus repository implements sovereign, self-contained local threat intelligence engines (`ThreatIntelEngine`) that ingest signed `.biu` threat bundles offline or through local channels, maintaining full sovereign privacy without cloud dependencies.

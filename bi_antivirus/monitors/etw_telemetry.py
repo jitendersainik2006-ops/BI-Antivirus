@@ -60,6 +60,8 @@ class ETWTelemetryProbe:
         self._monitor_stop_event = threading.Event()
         self._monitor_thread: Optional[threading.Thread] = None
         self._lock = threading.RLock()
+        self.last_poll_duration_ms: float = 0.0
+        self.total_polls: int = 0
 
         if check_registry_on_init and self.is_windows:
             self.refresh_provider_status()
@@ -179,11 +181,13 @@ class ETWTelemetryProbe:
     def poll_process_lifecycle_events(self) -> List[Dict[str, Any]]:
         """
         Compute snapshot differential to identify genuine process creation and termination events.
-        Produces ETW-equivalent telemetry in user-space without kernel drivers or ELAM certificates.
+        Operates as a user-space Process Lifecycle Polling Engine (fallback) via Toolhelp32 snapshots.
+        Note: True kernel ETW consumption requires Microsoft ELAM and PPL Antivirus EKU.
         """
         if not self.is_windows:
             return []
 
+        t0 = time.perf_counter()
         current_snap = {}
         h_snap = ctypes.windll.kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
         if h_snap == -1 or not h_snap:
@@ -212,7 +216,7 @@ class ETWTelemetryProbe:
         with self._lock:
             prev = self._previous_snapshot
 
-            # Detect newly started processes
+            # Detect newly started processes or PID reuse
             for pid, info in current_snap.items():
                 if pid not in prev:
                     event = {
@@ -222,10 +226,42 @@ class ETWTelemetryProbe:
                         "ppid": info["ppid"],
                         "image": info["exe"],
                         "threads": info["threads"],
-                        "provider": "Toolhelp32Fallback",
+                        "provider": "Toolhelp32PollingEngine",
+                        "pid_reuse_detected": False,
                     }
                     events.append(event)
                     self.record_diagnostic_event("PROCESS_START", event)
+                else:
+                    # PID reuse check: same PID but different executable or parent PID
+                    prev_info = prev[pid]
+                    if (
+                        info["exe"].lower() != prev_info.get("exe", "").lower()
+                        or info["ppid"] != prev_info.get("ppid", 0)
+                    ):
+                        term_ev = {
+                            "timestamp": time.time(),
+                            "event_type": "PROCESS_TERMINATE",
+                            "pid": pid,
+                            "ppid": prev_info.get("ppid", 0),
+                            "image": prev_info.get("exe", "unknown"),
+                            "provider": "Toolhelp32PollingEngine",
+                            "pid_reuse_detected": True,
+                        }
+                        events.append(term_ev)
+                        self.record_diagnostic_event("PROCESS_TERMINATE", term_ev)
+
+                        start_ev = {
+                            "timestamp": time.time(),
+                            "event_type": "PROCESS_START",
+                            "pid": pid,
+                            "ppid": info["ppid"],
+                            "image": info["exe"],
+                            "threads": info["threads"],
+                            "provider": "Toolhelp32PollingEngine",
+                            "pid_reuse_detected": True,
+                        }
+                        events.append(start_ev)
+                        self.record_diagnostic_event("PROCESS_START", start_ev)
 
             # Detect terminated processes
             for pid, info in prev.items():
@@ -236,12 +272,16 @@ class ETWTelemetryProbe:
                         "pid": pid,
                         "ppid": info.get("ppid", 0),
                         "image": info.get("exe", "unknown"),
-                        "provider": "Toolhelp32Fallback",
+                        "provider": "Toolhelp32PollingEngine",
+                        "pid_reuse_detected": False,
                     }
                     events.append(event)
                     self.record_diagnostic_event("PROCESS_TERMINATE", event)
 
             self._previous_snapshot = current_snap
+            duration_ms = (time.perf_counter() - t0) * 1000.0
+            self.last_poll_duration_ms = round(duration_ms, 2)
+            self.total_polls += 1
 
         return events
 
@@ -342,6 +382,8 @@ class ETWTelemetryProbe:
             events_count = len(self._diagnostic_events)
             recent_events = list(self._diagnostic_events[-10:])
             monitor_active = self._monitor_running
+            last_lat = self.last_poll_duration_ms
+            polls = self.total_polls
 
         return {
             "supported": self.is_windows,
@@ -352,10 +394,14 @@ class ETWTelemetryProbe:
             "can_start_trace": admin_allowed,
             "active_trace_sessions_count": len(active_sessions),
             "active_trace_sessions": active_sessions,
+            "etw_kernel_consumer_active": False,
+            "etw_kernel_requirement": "Direct kernel ETW TI subscription requires Microsoft ELAM and PPL Antivirus EKU.",
             "fallback_active": True,
-            "fallback_mechanism": "Native Toolhelp32 Process Tree Differential Engine & ReadDirectoryChangesW",
+            "fallback_mechanism": "Win32 Toolhelp32 Process Lifecycle Polling Engine (User-Space Fallback) & ReadDirectoryChangesW",
             "fallback_snapshot_pids_tracked": pids_tracked,
             "fallback_monitoring_active": monitor_active,
+            "last_poll_duration_ms": last_lat,
+            "total_polls": polls,
             "message": message,
             "diagnostic_events_count": events_count,
             "recent_events": recent_events,

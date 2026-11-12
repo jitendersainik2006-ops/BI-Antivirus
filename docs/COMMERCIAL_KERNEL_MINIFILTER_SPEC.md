@@ -55,9 +55,12 @@ flowchart TD
 In accordance with Microsoft Windows Filter Manager Altitude Allocations:
 - **Filter Load Order Group:** `FSFilter Anti-Virus`
 - **Altitude Range:** `320000 - 329999`
-- **Requested Altitude:** `326450`
+- **Illustrative Requested Altitude:** `326450` *(Subject to Microsoft formal assignment)*
 - **Driver Name:** `BIAntiVirusFilter.sys`
 - **Service Name:** `BIAntiVirusFlt`
+
+> [!IMPORTANT]
+> **Microsoft Altitude Assignment Notice:** The altitude `326450` represents a proposed illustrative allocation within the official Microsoft antivirus altitude band. Filter altitudes are assigned exclusively by Microsoft Corporation upon formal submission via the Windows Filter Altitude Request process. Altitudes cannot be self-assigned or assumed approved.
 
 ### 3.3 Core Filter Manager API Functions
 | Function | Purpose |
@@ -162,3 +165,12 @@ typedef struct _BI_SCAN_RESPONSE {
 | **System BSOD from IRQL Violation** | Critical | Strict static code analysis with SDV (Static Driver Verifier); all memory allocation from non-paged pool; zero blocking operations at DISPATCH_LEVEL. |
 | **Deadlock on CommPort Timeout** | High | Kernel `FltSendMessage` uses strict 2.5-second timeout. If Ring 3 fails to answer, defaults to fail-safe policy and logs warning. |
 | **I/O Starvation / System Latency** | Medium | Multi-tiered kernel caching of verified clean executables; files signed by Microsoft WHQL bypass full hashing after first verification. |
+
+---
+
+## 9. Engineering Dependencies, Specialist Skills & Validation Effort
+
+- **Infrastructure Requirements:** Dedicated dual-machine kernel debugging laboratory (host + target VM) connected via Virtual KDNET; Windows Hardware Lab Kit (HLK) test cluster.
+- **Specialist Capabilities Required:** Senior Windows Kernel Driver Developer (C / WDK / Filter Manager), reverse engineering and kernel crash triage specialist (WinDbg).
+- **Certification & Deployment Prerequisites:** Corporate Extended Validation (EV) Code Signing Certificate, Microsoft Partner Center account, WHQL certification pass.
+- **Implementation Boundary:** This document defines the engineering design for a future kernel-mode driver component. It is distinct from the current sovereign, user-space BI Antivirus platform. Ring 0 drivers are NOT deployed in the current repository.

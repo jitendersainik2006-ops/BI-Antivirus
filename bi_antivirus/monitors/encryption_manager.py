@@ -327,15 +327,16 @@ class DiskEncryptionSentinel:
                             volumes.append({
                                 "drive_letter": dl,
                                 "size_gb": total_gb,
-                                "bitlocker_version": "BitLocker / Device Encryption" if tpm_info.get("tpm_present") else "None",
+                                "bitlocker_version": "Unconfirmed (Audit Unprivileged)",
                                 "conversion_status": status_desc,
                                 "percentage_encrypted": 0.0,
-                                "encryption_method": "XTS-AES (Hardware)" if tpm_info.get("tpm_present") else "None",
-                                "protection_status": "Protection Off / Unmanaged",
+                                "encryption_method": "Unknown (Elevation Required)",
+                                "protection_status": "Protection Status Unconfirmed (Elevation Required)",
                                 "lock_status": "Unlocked",
-                                "key_protectors": ["TPM 2.0 (Detected)"] if tpm_info.get("tpm_ready") else [],
+                                "key_protectors": ["TPM 2.0 (Hardware Present)"] if tpm_info.get("tpm_ready") else [],
                                 "is_compliant": False,
                                 "compliance_severity": SEVERITY_MEDIUM,
+                                "notes": "Hardware TPM detected; volume encryption state requires Administrator privilege to verify.",
                             })
             except Exception as e:
                 logger.debug(f"Win32 drive enumeration fallback failed: {e}")
@@ -345,11 +346,11 @@ class DiskEncryptionSentinel:
                 volumes = [{
                     "drive_letter": "C:\\",
                     "size_gb": 0.0,
-                    "bitlocker_version": "Windows BitLocker",
-                    "conversion_status": "Audit Restricted / Unencrypted",
+                    "bitlocker_version": "Unconfirmed (Elevation Required)",
+                    "conversion_status": "Audit Restricted / Unverified",
                     "percentage_encrypted": 0,
                     "encryption_method": "Unknown",
-                    "protection_status": "Protection Off or Windows Home Edition",
+                    "protection_status": "Protection Status Unconfirmed (Elevation Required)",
                     "lock_status": "Unlocked",
                     "key_protectors": [],
                     "is_compliant": False,

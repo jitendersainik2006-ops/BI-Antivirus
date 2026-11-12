@@ -9,9 +9,23 @@ import time
 import subprocess
 import re
 import logging
+import ipaddress
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+from bi_antivirus.config import DATA_DIR
+
 logger = logging.getLogger("bi_antivirus.firewall_monitor")
+
+ISOLATION_RULE_NAMES = [
+    "BI-EDR-ISOLATE-MGMT-OUT",
+    "BI-EDR-ISOLATE-MGMT-IN",
+    "BI-EDR-ISOLATE-CORE-OUT",
+    "BI-EDR-ISOLATE-LOOPBACK-IN",
+    "BI-EDR-ISOLATE-LOOPBACK-OUT",
+    "BI-EDR-ISOLATE-BLOCK-OUT",
+    "BI-EDR-ISOLATE-BLOCK-IN",
+]
 
 try:
     import winreg
@@ -325,11 +339,18 @@ class FirewallMonitor:
         }
 
     @classmethod
-    def isolate_host(cls, allowed_ips: Optional[List[str]] = None, admin_token: str = "") -> Dict[str, Any]:
+    def isolate_host(
+        cls,
+        allowed_ips: Optional[List[str]] = None,
+        admin_token: str = "",
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
         """
-        Emergency EDR Network Isolation: Blocks all inbound and outbound host traffic,
-        allowing only loopback, local DNS (port 53), DHCP (ports 67/68), and designated management IP(s).
+        Emergency EDR Network Isolation: Blocks untrusted inbound and outbound host traffic,
+        strictly preserving bidirectional corporate management IP(s), local DNS (port 53),
+        DHCP (ports 67/68), and loopback (127.0.0.1).
         Enforced at OS level via Windows Defender Firewall.
+        Mandates explicit administrator authorization token.
         """
         if not cls.verify_admin_authorization(admin_token):
             return {
@@ -337,51 +358,93 @@ class FirewallMonitor:
                 "error": "UNAUTHORIZED: Administrator authorization token required for network isolation.",
             }
 
-        allowed_ips = allowed_ips or ["127.0.0.1"]
-        mgmt_ips_str = ",".join(allowed_ips)
+        # Validate and sanitize allowed_ips to prevent command injection
+        raw_ips = allowed_ips or ["127.0.0.1"]
+        clean_ips = []
+        for ip_entry in raw_ips:
+            ip_str = str(ip_entry).strip()
+            # Prevent shell injection characters
+            if any(c in ip_str for c in ("&", "|", ";", '"', "'", "\n", "\r", "$", "`")):
+                return {
+                    "success": False,
+                    "error": f"SECURITY_ERROR: Malformed IP address entry contains forbidden characters: '{ip_str}'",
+                }
+            try:
+                # Validate IP or CIDR network
+                ipaddress.ip_network(ip_str, strict=False)
+                clean_ips.append(ip_str)
+            except ValueError:
+                return {
+                    "success": False,
+                    "error": f"INVALID_IP: Entry '{ip_str}' is not a valid IPv4 or IPv6 address/CIDR.",
+                }
 
+        mgmt_ips_str = ",".join(clean_ips)
+        is_test_mode = dry_run or os.environ.get("BI_TEST_MODE") == "1"
+
+        # Explicit bidirectional rules preserving management access
         rules_to_create = [
             f'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-MGMT-OUT" dir=out action=allow remoteip={mgmt_ips_str} protocol=ANY',
+            f'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-MGMT-IN" dir=in action=allow remoteip={mgmt_ips_str} protocol=ANY',
             'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-CORE-OUT" dir=out action=allow protocol=UDP remoteport=53,67,68',
+            'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-LOOPBACK-IN" dir=in action=allow remoteip=127.0.0.1 protocol=ANY',
+            'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-LOOPBACK-OUT" dir=out action=allow remoteip=127.0.0.1 protocol=ANY',
             'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-BLOCK-OUT" dir=out action=block',
             'netsh advfirewall firewall add rule name="BI-EDR-ISOLATE-BLOCK-IN" dir=in action=block',
         ]
 
         applied = []
-        if os.name == "nt":
+        if os.name == "nt" and not is_test_mode:
             for cmd in rules_to_create:
                 try:
                     res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
-                    if res.returncode != 0 and "requires elevation" in res.stderr.lower():
+                    if res.returncode != 0:
+                        err_out = (res.stderr or res.stdout or "").lower()
+                        # Rollback any rules already applied to avoid leaving host in broken state
+                        cls.unisolate_host(admin_token=admin_token, dry_run=is_test_mode)
+                        if "requires elevation" in err_out or "administrator" in err_out:
+                            return {
+                                "success": False,
+                                "error": "Elevation required: Windows Defender Firewall isolation mandates elevated Administrator token.",
+                                "status": "REQUIRES_ELEVATION",
+                            }
                         return {
                             "success": False,
-                            "error": "Elevation required: Windows Defender Firewall isolation mandates elevated Administrator token.",
-                            "status": "REQUIRES_ELEVATION",
+                            "error": f"Failed applying firewall isolation rule: {res.stderr.strip()}",
+                            "status": "APPLY_FAILED_ROLLED_BACK",
                         }
                     applied.append(cmd)
                 except Exception as ex:
-                    pass
+                    cls.unisolate_host(admin_token=admin_token, dry_run=is_test_mode)
+                    return {
+                        "success": False,
+                        "error": f"Subprocess exception during isolation rule creation: {ex}",
+                        "status": "EXCEPTION_ROLLED_BACK",
+                    }
         else:
             applied = rules_to_create
 
-        cls._applied_rules["BI-EDR-ISOLATE-BLOCK-OUT"] = {
-            "rule_name": "BI-EDR-ISOLATE-BLOCK-OUT",
-            "action": "block",
-            "direction": "out",
-            "status": "APPLIED",
-            "applied_at": time.time(),
-        }
+        for name in ISOLATION_RULE_NAMES:
+            cls._applied_rules[name] = {
+                "rule_name": name,
+                "action": "block" if "BLOCK" in name else "allow",
+                "direction": "in" if "-IN" in name else "out",
+                "status": "APPLIED",
+                "applied_at": time.time(),
+                "test_mode": is_test_mode,
+            }
 
         return {
             "success": True,
             "status": "ISOLATED",
             "rules_applied": len(applied),
-            "allowed_management_ips": allowed_ips,
+            "allowed_management_ips": clean_ips,
+            "dry_run": is_test_mode,
             "message": "Host successfully isolated at Windows Firewall layer.",
         }
 
     @classmethod
-    def unisolate_host(cls, admin_token: str = "") -> Dict[str, Any]:
+    def unisolate_host(cls, admin_token: str = "", dry_run: bool = False) -> Dict[str, Any]:
         """
         Remove EDR Network Isolation rules, restoring standard network connectivity.
         """
@@ -391,28 +454,52 @@ class FirewallMonitor:
                 "error": "UNAUTHORIZED: Administrator authorization token required.",
             }
 
-        rule_names = [
-            "BI-EDR-ISOLATE-MGMT-OUT",
-            "BI-EDR-ISOLATE-CORE-OUT",
-            "BI-EDR-ISOLATE-BLOCK-OUT",
-            "BI-EDR-ISOLATE-BLOCK-IN",
-        ]
+        is_test_mode = dry_run or os.environ.get("BI_TEST_MODE") == "1"
 
-        if os.name == "nt":
-            for name in rule_names:
+        if os.name == "nt" and not is_test_mode:
+            for name in ISOLATION_RULE_NAMES:
                 try:
-                    subprocess.run(f'netsh advfirewall firewall delete rule name="{name}"', shell=True, capture_output=True, text=True, timeout=5)
+                    subprocess.run(
+                        f'netsh advfirewall firewall delete rule name="{name}"',
+                        shell=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
                 except Exception:
                     pass
 
-        for name in rule_names:
+        for name in ISOLATION_RULE_NAMES:
             cls._applied_rules.pop(name, None)
 
         return {
             "success": True,
             "status": "UNISOLATED",
+            "dry_run": is_test_mode,
             "message": "Host network isolation lifted. Standard connectivity restored.",
         }
+
+    @classmethod
+    def generate_emergency_recovery_script(cls, output_path: Optional[Path] = None) -> Path:
+        """
+        Generate a standalone emergency batch script to restore network connectivity
+        in the event that BI Antivirus daemon terminates while host is isolated.
+        """
+        if output_path is None:
+            output_path = DATA_DIR / "emergency_firewall_restore.bat"
+
+        lines = [
+            "@echo off",
+            "echo [BI Antivirus] Restoring network connectivity and tearing down EDR isolation rules...",
+        ]
+        for name in ISOLATION_RULE_NAMES:
+            lines.append(f'netsh advfirewall firewall delete rule name="{name}" >nul 2>&1')
+        lines.append("echo [BI Antivirus] EDR isolation rules removed. Normal network restored.")
+        lines.append("pause")
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+        return output_path
 
     @classmethod
     def audit_dangerous_firewall_rules(cls) -> List[Dict[str, Any]]:

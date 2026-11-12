@@ -1,0 +1,10 @@
+# ==============================================================================
+# BI Antivirus Enterprise - Python Dependencies
+# Verified Runtime: Python 3.12 (specifically tested on Python 3.12.10 64-bit on Windows 10/11 x64)
+# Compatible Syntax: Python 3.10+ (Python 3.12 standard library and typing baseline)
+#
+# Core platform runs natively using Python 3 standard library and Win32 ctypes.
+# The following package supports process tree telemetry and system inspection.
+# ==============================================================================
+
+psutil>=5.9.0

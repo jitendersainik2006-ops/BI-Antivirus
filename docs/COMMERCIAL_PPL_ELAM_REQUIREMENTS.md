@@ -52,7 +52,10 @@ Protected Process Light (PPL) and ELAM cannot be activated with self-signed cert
 | **Microsoft Hardware Developer Account** | Verified organization dashboard with Azure AD Tenant. | Microsoft Partner Center |
 | **WHQL Hardware Compatibility** | Passing Windows Hardware Lab Kit (HLK) test suites. | Microsoft Windows Hardware Lab |
 | **ELAM Signing Attestation** | Microsoft cryptographically signs the ELAM driver binary. | Microsoft Corporation |
-| **PPL Antivirus EKU** | Microsoft-issued Enhanced Key Usage (`1.3.6.1.4.1.311.61.1.1`). | Microsoft Security Partner Agreement |
+| **PPL Antivirus EKU** | Microsoft-issued Enhanced Key Usage (`1.3.6.1.4.1.311.61.4.1`). | Microsoft Security Partner Agreement |
+
+> [!IMPORTANT]
+> **Microsoft Access Boundary:** Protected Process Light (PPL) and ELAM certificates are not automatically obtainable, cannot be self-issued, and cannot be activated via standard administrative elevation. Access mandates an active commercial partnership contract with Microsoft Corporation (e.g. Microsoft Virus Initiative - MVI), thorough business vetting, and custom Authenticode EKU signatures issued directly by Microsoft. This architecture describes enterprise commercial requirements, not an active in-repo user-space feature.
 
 ---
 
@@ -136,18 +139,10 @@ A major capability gap in standard user-mode antivirus is inability to subscribe
 ## 7. Step-by-Step Production Roadmap
 
 ```mermaid
-gantt
-    title PPL & ELAM Production Roadmap
-    dateFormat  YYYY-MM-DD
-    section Legal & Entity Verification
-    EV Certificate Acquisition         :done,    des1, 2026-01-01, 2026-02-01
-    Partner Center Tenant & Agreement  :active,  des2, 2026-02-01, 2026-03-15
-    section Engineering Implementation
-    Author BIElam.sys Driver           :         des3, 2026-03-15, 2026-04-15
-    PPL Service Isolation Harness      :         des4, 2026-04-15, 2026-05-15
-    section WHQL & Certification
-    HLK Test Suite Execution (x64)     :         des5, 2026-05-15, 2026-06-15
-    Microsoft Driver Signing Portal    :         des6, 2026-06-15, 2026-07-01
+flowchart LR
+    Phase1["Phase 1: Legal & Identity<br/>(EV Certificate & Partner Center)"] --> Phase2["Phase 2: Driver Development<br/>(BIElam.sys & PPL Daemon Harness)"]
+    Phase2 --> Phase3["Phase 3: WHQL Certification<br/>(HLK Test Execution & Passing)"]
+    Phase3 --> Phase4["Phase 4: Microsoft Signing<br/>(Attestation & Antivirus EKU)"]
 ```
 
 ---
@@ -159,3 +154,12 @@ gantt
 | **Boot Driver Loop (Boot-Looping OS)** | Disastrous | ELAM driver implements fail-safe watchdog timer; if signature check encounters corruption, defaults to `BdCbClassificationGoodKnown` to preserve OS bootability. |
 | **Certificate Revocation by Microsoft** | Critical | Strict adherence to Microsoft Antivirus Vendor Code of Conduct; rigorous pre-release security audits of all update pipelines. |
 | **PPL Debugging Obstacle** | High | Kernel debugging on test rigs requires `/DEBUG` boot flag and custom certificate bypasses during development. |
+
+---
+
+## 9. Engineering Dependencies, Specialist Skills & Validation Effort
+
+- **Organizational Prerequisite:** Formally registered commercial legal entity in good standing, corporate EV hardware certificate, verified Microsoft Partner Center account.
+- **Specialist Capabilities Required:** Windows Kernel Driver Developer (C / WDK), Security Certification Engineer, HLK automated test operator.
+- **Infrastructure Dependencies:** Hardware Lab Kit (HLK) server + client testbed running Windows 10/11 & Server targets; dedicated secure hardware security module (HSM) for key custody.
+- **Scope Distinction:** ELAM and PPL operate at Ring 0 and early boot loader layers. The current BI Antivirus repository operates strictly in sovereign Windows user space. Kernel drivers and PPL isolation require the above Microsoft certifications before production binary compilation.

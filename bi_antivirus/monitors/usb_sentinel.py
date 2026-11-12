@@ -189,18 +189,58 @@ class USBSentinel:
                     ext = entry.suffix.lower()
                     if ext == ".lnk":
                         lnk_count += 1
-                        # Inspect LNK raw bytes for embedded command interpreter payloads
+                        # Inspect LNK raw bytes for weaponized command execution patterns
                         try:
-                            raw_b = entry.read_bytes()[:2048].lower()
-                            if any(k in raw_b for k in (b"powershell", b"cmd.exe", b"mshta", b"certutil", b"wscript", b"cscript")):
-                                is_threat = True
-                                risk_score += 95
-                                threats_found.append({
-                                    "file_path": str(entry),
-                                    "threat_name": "Worm.Removable.MaliciousLNKPayload",
-                                    "severity": SEVERITY_CRITICAL,
-                                    "description": f"Shortcut '{entry.name}' contains embedded command interpreter launch sequence.",
-                                })
+                            raw_b = entry.read_bytes()[:4096].lower()
+                            # Handle malformed or truncated LNK (< 76 bytes standard shell link header)
+                            if len(raw_b) >= 32:
+                                # Weaponized execution patterns
+                                weaponized_indicators = (
+                                    b"-w hidden",
+                                    b"-window hidden",
+                                    b"-windowstyle hidden",
+                                    b"-enc ",
+                                    b"-encodedcommand ",
+                                    b"-ep bypass",
+                                    b"-executionpolicy bypass",
+                                    b"-nop",
+                                    b"-noprofile",
+                                    b"mshta http",
+                                    b"mshta vbscript",
+                                    b"mshta javascript",
+                                    b"cmd.exe /c",
+                                    b"cmd.exe /k",
+                                    b"cmd /c",
+                                    b"cmd /k",
+                                    b"cscript //e:",
+                                    b"wscript //e:",
+                                    b"downloadstring",
+                                    b"invoke-webrequest",
+                                    b"certutil -urlcache",
+                                    b"bitsadmin /transfer",
+                                )
+                                shell_indicators = (b"powershell", b"cmd.exe", b"mshta", b"certutil", b"wscript", b"cscript")
+                                is_weaponized = any(w in raw_b for w in weaponized_indicators)
+                                has_shell = any(s in raw_b for s in shell_indicators)
+
+                                if is_weaponized:
+                                    is_threat = True
+                                    risk_score += 95
+                                    threats_found.append({
+                                        "file_path": str(entry),
+                                        "threat_name": "Worm.Removable.MaliciousLNKPayload",
+                                        "severity": SEVERITY_CRITICAL,
+                                        "description": f"Shortcut '{entry.name}' contains embedded command interpreter launch sequence (weaponized execution cradle).",
+                                    })
+                                elif has_shell:
+                                    # Benign administrative shortcut pointing to shell without obfuscation/weaponization
+                                    risk_score += 10
+                                    threats_found.append({
+                                        "file_path": str(entry),
+                                        "threat_name": "Suspicious.Removable.AdminShortcut",
+                                        "severity": "LOW",
+                                        "description": f"Shortcut '{entry.name}' references command shell without weaponized parameters (administrative profile).",
+                                    })
                         except Exception:
                             pass
                     elif ext in (".exe", ".scr", ".vbs", ".bat", ".cmd", ".pif"):

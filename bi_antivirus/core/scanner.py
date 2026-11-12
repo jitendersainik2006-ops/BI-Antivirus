@@ -15,6 +15,7 @@ from typing import List, Dict, Any, Optional, Callable, Set
 from concurrent.futures import ThreadPoolExecutor
 
 from bi_antivirus.config import (
+    PROJECT_ROOT,
     SCAN_TYPE_QUICK,
     SCAN_TYPE_FULL,
     SCAN_TYPE_CUSTOM,
@@ -131,7 +132,7 @@ class FileScanner:
                 targets.append(p)
 
         # Include workspace test directory for immediate verification
-        workspace_test = Path(r"D:\bit defender\bi_antivirus\tests\fixtures")
+        workspace_test = PROJECT_ROOT / "bi_antivirus" / "tests" / "fixtures"
         if workspace_test.exists():
             targets.append(workspace_test)
 
@@ -180,10 +181,9 @@ class FileScanner:
             targets.append(user_home / "Pictures")
             targets.append(user_home / "AppData" / "Local" / "Temp")
 
-        # Also scan D: project drive root files
-        d_root = Path(r"D:\bit defender")
-        if d_root.exists():
-            targets.append(d_root)
+        # Also scan project root files
+        if PROJECT_ROOT.exists():
+            targets.append(PROJECT_ROOT)
 
         return self._run_scan_pipeline(targets, scan_type=SCAN_TYPE_FULL, progress_cb=progress_cb)
 

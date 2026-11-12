@@ -33,7 +33,7 @@ logger = logging.getLogger("BI_IncidentGraph")
 class IncidentNode:
     """Represents an entity in the EDR incident graph."""
     node_id: str
-    node_type: str  # PROCESS, FILE, NETWORK, DEVICE, MEMORY, POLICY
+    node_type: str  # PROCESS, FILE, NETWORK, DEVICE, MEMORY, POLICY, IDENTITY, CLOUD
     label: str
     properties: Dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
@@ -234,6 +234,10 @@ class IncidentGraphEngine:
             self._handle_app_control(incident, data)
         elif event_type == "MEMORY_EXPLOIT_ALERT":
             self._handle_memory_exploit(incident, data)
+        elif event_type in ("IDENTITY_LOGON_ANOMALY", "AUTH_ANOMALY", "IDENTITY_EVENT"):
+            self._handle_identity_event(incident, data)
+        elif event_type in ("CLOUD_WEBHOOK_EVENT", "CLOUD_SOAR_ALERT", "CLOUD_EVENT"):
+            self._handle_cloud_event(incident, data)
         else:
             self._handle_generic_event(incident, event_type, data)
 
@@ -262,6 +266,12 @@ class IncidentGraphEngine:
             candidate_keys.append(f"file:{str(file_path).lower()}")
         if drive_letter:
             candidate_keys.append(f"dev:{str(drive_letter).upper()}")
+        username = data.get("username")
+        if username:
+            candidate_keys.append(f"identity:{str(username).lower()}")
+        service_name = data.get("service_name")
+        if service_name:
+            candidate_keys.append(f"cloud:{str(service_name).lower()}")
 
         # Look up existing active incident
         for k in candidate_keys:
@@ -597,6 +607,95 @@ class IncidentGraphEngine:
                 evidence_type="SUSPICIOUS_INDICATOR",
                 evidence_confidence=0.70,
                 source_reference="ExploitShield.VirtualQueryEx",
+            )
+
+    def _handle_identity_event(self, incident: EDRIncident, data: Dict[str, Any]) -> None:
+        user = data.get("username", "SYSTEM")
+        identity_node_id = f"identity:{str(user).lower()}"
+
+        incident.add_node(IncidentNode(
+            node_id=identity_node_id,
+            node_type="IDENTITY",
+            label=f"User: {user}",
+            properties={
+                "username": user,
+                "domain": data.get("domain", "LOCAL"),
+                "auth_type": data.get("auth_type", "NTLM"),
+                "logon_type": data.get("logon_type", 2),
+                "is_elevated": data.get("is_elevated", False),
+            },
+        ))
+
+        pid = data.get("pid")
+        if pid:
+            proc_node_id = f"proc:{pid}"
+            incident.add_edge(IncidentEdge(
+                source_id=proc_node_id,
+                target_id=identity_node_id,
+                relation="AUTHENTICATED_AS",
+                metadata={"auth_type": data.get("auth_type", "NTLM")},
+            ))
+
+        incident.add_timeline_event(
+            event_type="IDENTITY_EVENT",
+            source="IdentitySentinel",
+            message=f"Identity activity for '{user}': {data.get('action', 'Logon Event')}",
+            details=data,
+        )
+
+        if data.get("anomaly_type") == "BRUTE_FORCE":
+            incident.add_mitre_technique(
+                "T1110",
+                "Brute Force",
+                "Credential Access",
+                f"Repeated authentication failures detected for account '{user}': {data.get('fail_count', 0)} attempts",
+                evidence_type="CONFIRMED_DETECTION",
+                evidence_confidence=0.90,
+                source_reference="IdentitySentinel.LogonAudit",
+            )
+        elif data.get("anomaly_type") == "PRIVILEGE_ESCALATION":
+            incident.add_mitre_technique(
+                "T1078",
+                "Valid Accounts: Local Accounts",
+                "Privilege Escalation / Defense Evasion",
+                f"Unexpected administrative token assignment to account '{user}'",
+                evidence_type="SUSPICIOUS_INDICATOR",
+                evidence_confidence=0.80,
+                source_reference="IdentitySentinel.TokenAudit",
+            )
+
+    def _handle_cloud_event(self, incident: EDRIncident, data: Dict[str, Any]) -> None:
+        service_name = data.get("service_name", "CloudService")
+        cloud_node_id = f"cloud:{str(service_name).lower()}"
+
+        incident.add_node(IncidentNode(
+            node_id=cloud_node_id,
+            node_type="CLOUD",
+            label=f"Cloud: {service_name}",
+            properties={
+                "service": service_name,
+                "tenant_id": data.get("tenant_id", "local_tenant"),
+                "action": data.get("action", "SYNC"),
+                "endpoint": data.get("endpoint", ""),
+            },
+        ))
+
+        incident.add_timeline_event(
+            event_type="CLOUD_EVENT",
+            source="CloudBridge",
+            message=f"Cloud telemetry event from '{service_name}': {data.get('action', 'Alert')}",
+            details=data,
+        )
+
+        if data.get("suspicious_exfil"):
+            incident.add_mitre_technique(
+                "T1567",
+                "Exfiltration Over Web Service",
+                "Exfiltration",
+                f"High-volume data transfer to cloud endpoint '{service_name}' ({data.get('bytes_transferred', 0)} bytes)",
+                evidence_type="SUSPICIOUS_INDICATOR",
+                evidence_confidence=0.75,
+                source_reference="CloudBridge.Telemetry",
             )
 
     def _handle_generic_event(self, incident: EDRIncident, event_type: str, data: Dict[str, Any]) -> None:

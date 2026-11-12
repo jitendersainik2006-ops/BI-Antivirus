@@ -16,10 +16,11 @@ from bi_antivirus.core.incident_graph import (
     IncidentEdge,
     MitreTechnique,
 )
+from bi_antivirus.config import SCRATCH_DIR
 from bi_antivirus.database.history import HistoryDatabase
 
 # Strict containment to D: drive
-D_DRIVE_SCRATCH = Path(r"D:\bit defender\data\crypto_test_scratch")
+D_DRIVE_SCRATCH = SCRATCH_DIR
 
 
 class TestEDRIncidentGraph(unittest.TestCase):
@@ -217,6 +218,52 @@ class TestEDRIncidentGraph(unittest.TestCase):
         single = self.history_db.get_edr_incident_by_id(inc_id)
         self.assertIsNotNone(single)
         self.assertEqual(single["incident_id"], inc_id)
+
+    def test_identity_logon_anomaly_correlation(self):
+        """Verify identity anomalies create IDENTITY nodes, auth edges, and MITRE T1110 technique."""
+        # First spawn process
+        self.engine.ingest_event("PROCESS_SPAWN", {
+            "pid": 4000,
+            "ppid": 1000,
+            "process_name": "mimikatz.exe",
+            "cmdline": "mimikatz.exe",
+        })
+
+        inc_id = self.engine.ingest_event("IDENTITY_LOGON_ANOMALY", {
+            "pid": 4000,
+            "username": "AdminUser",
+            "anomaly_type": "BRUTE_FORCE",
+            "fail_count": 10,
+            "action": "Bursted Failed Logons",
+        })
+
+        inc = self.engine.incidents[inc_id]
+        self.assertIn("identity:adminuser", inc.nodes)
+        self.assertEqual(inc.nodes["identity:adminuser"].node_type, "IDENTITY")
+
+        auth_edges = [e for e in inc.edges if e.relation == "AUTHENTICATED_AS"]
+        self.assertTrue(len(auth_edges) >= 1)
+
+        t1110 = [t for t in inc.mitre_techniques if t.id == "T1110"]
+        self.assertEqual(len(t1110), 1)
+        self.assertEqual(t1110[0].name, "Brute Force")
+
+    def test_cloud_webhook_event_correlation(self):
+        """Verify cloud telemetry creates CLOUD nodes and MITRE T1567 exfiltration mapping."""
+        inc_id = self.engine.ingest_event("CLOUD_WEBHOOK_EVENT", {
+            "service_name": "Office365_Exfil",
+            "suspicious_exfil": True,
+            "bytes_transferred": 50000000,
+            "action": "Mass Download Alert",
+        })
+
+        inc = self.engine.incidents[inc_id]
+        self.assertIn("cloud:office365_exfil", inc.nodes)
+        self.assertEqual(inc.nodes["cloud:office365_exfil"].node_type, "CLOUD")
+
+        t1567 = [t for t in inc.mitre_techniques if t.id == "T1567"]
+        self.assertEqual(len(t1567), 1)
+        self.assertEqual(t1567[0].name, "Exfiltration Over Web Service")
 
 
 if __name__ == "__main__":

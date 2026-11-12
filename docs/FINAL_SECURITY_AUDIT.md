@@ -42,6 +42,11 @@ Every identified potential weakness from previous sprints has been systematicall
 | **EDR Subsystem** | Unbounded memory consumption during long uptime | MEDIUM | Sprint 14 added `max_memory_incidents = 500` with `_prune_memory_cache()` LRU eviction to prevent memory leaks. | `test_sprint14_performance_reliability.py` | **RESOLVED** |
 | **Storage / DB** | Crash or abrupt power cut corrupting SQLite state | HIGH | Sprint 15 added `CrashRecoveryManager`, detecting dead PIDs in `data/bi_antivirus.lock`, merging WAL checkpoints, and purging orphaned `.tmp` vault files. | `test_sprint15_windows_integration.py` | **RESOLVED** |
 | **SIEM / Audit** | Retroactive log tampering or record reordering | HIGH | Sprint 16 added cryptographic backward hash chaining ($H_i = \text{SHA256}(H_{i-1} \parallel E_i)$) in `SIEMExporter`. | `test_sprint16_gui_workflows.py` | **RESOLVED** |
+| **Firewall Isolation** | Accidental management lockout during EDR isolation | HIGH | Bidirectional management rules (`MGMT-IN`/`MGMT-OUT`), loopback rules, atomic rollback on netsh error, and emergency batch script recovery. | `test_commercial_parity_enhancements.py` | **RESOLVED** |
+| **Firewall Isolation** | Command / shell injection via allowed_ips | CRITICAL | Strict `ipaddress` validation and regex sanitization rejecting shell metacharacters before calling netsh. | `test_commercial_parity_enhancements.py` | **RESOLVED** |
+| **LNK Inspection** | Benign admin shell shortcuts flagged as critical worms | MEDIUM | Parser distinguishes weaponized execution flags (`-w hidden`, `-enc`, download cradles) from benign administrative tools. | `test_commercial_parity_enhancements.py` | **RESOLVED** |
+| **Exploit Shield** | False positive convictions on JIT / dynamic code runtimes | MEDIUM | Expanded JIT profiles (`powershell`, `.NET`, `electron`), non-conclusive heuristic classification, read-only memory inspection. | `test_commercial_parity_enhancements.py` | **RESOLVED** |
+| **Zone.Identifier** | Ingress provenance alone convicted as malware | MEDIUM | ADS inspection calibrated: ZoneId is provenance modifier, requiring substantive ML suspicion before conviction; unsupported filesystems fail safe. | `test_commercial_parity_enhancements.py` | **RESOLVED** |
 
 ---
 

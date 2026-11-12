@@ -3,10 +3,75 @@
 
 [![Engine Version](https://img.shields.io/badge/Engine-2026.11--RELEASE-00d285.svg)](#)
 [![Platform Version](https://img.shields.io/badge/Platform-2.0.0--ENTERPRISE-00b4d8.svg)](#)
-[![Automation](https://img.shields.io/badge/n8n_Community-v2.46.5-ff6d5a.svg)](#)
-[![Tests Passing](https://img.shields.io/badge/Tests-236%2F236%20PASSING-brightgreen.svg)](#)
+[![Tests Passing](https://img.shields.io/badge/Tests-276%2F276%20PASSING-brightgreen.svg)](#)
+[![Test Suites](https://img.shields.io/badge/Suites-44%20Suites-00d285.svg)](#)
 [![Security](https://img.shields.io/badge/Binding-127.0.0.1%20Loopback%20Only-blueviolet.svg)](#)
-[![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011-0078d7.svg)](#)
+[![Platform](https://img.shields.io/badge/OS-Windows%2010%20%7C%2011%20x64-0078d7.svg)](#)
+
+---
+
+## ⚡ Quick Evaluation & Clone Instructions for Sir (8 Simple Steps)
+
+Respected Sir, to independently verify and test the complete platform on any Windows 10/11 x64 machine:
+
+> [!NOTE]
+> **Working Directory Assumption**: All commands assume execution from the project root directory (`D:\bit defender` or junction `D:\BI-Antivirus`). The provided batch files (`.bat`) automatically resolve and set the root directory via `cd /d "%~dp0"`.
+
+### 1. Clone the GitHub Repository
+```powershell
+git clone https://github.com/jitendersainik2006-ops/BI-Antivirus.git
+cd BI-Antivirus
+```
+
+### 2. Verify Python Runtime & Install Dependencies
+Requires **Python 3.12 (64-bit)** (specifically tested and verified on Python 3.12.10 x64; compatible with Python 3.10+):
+```powershell
+pip install -r requirements.txt
+```
+
+### 3. Run the Windows Setup Wizard
+Initializes local SQLite databases, establishes isolated storage directories, and seeds test signatures:
+```powershell
+.\setup_windows.bat
+# Or alternatively: python scripts\install_windows.py
+```
+
+### 4. Launch the Desktop GUI Dashboard (13 Views)
+```powershell
+.\run_gui.bat
+# Or alternatively: python main.py
+```
+
+### 5. Run the Harmless Automated 10-Stage Live Demonstration
+Executes a safe end-to-end evaluation using harmless synthetic signatures (zero live malware, zero network cuts):
+```powershell
+.\run_demo.bat
+# Or alternatively: python scripts\demo_full_lifecycle.py
+```
+
+### 6. Run the Complete Automated Test Suite (276 Tests across 44 Suites)
+```powershell
+.\run_tests.bat
+# Or alternatively: python run_tests.py
+```
+
+### 7. Run the Clean Environment Acceptance Test
+Executes an end-to-end clean-slate test in an isolated local directory (`D:\bit defender\data\clean_acceptance_test`) and verifies 7 acceptance gates (verified locally without requiring a separate physical PC):
+```powershell
+python scripts\verify_clean_acceptance.py
+```
+
+### 8. Package or Safely Uninstall
+- **Build Unsigned Standalone Portable Distribution Bundle (.zip):**
+  ```powershell
+  python scripts\package_windows.py
+  ```
+  *Produces an unsigned portable distribution package (`dist\BI_Antivirus_Enterprise_v1.0.0_Portable.zip`). Requires an Authenticode EV digital certificate for production Windows SmartScreen whitelisting.*
+- **Safe Windows Uninstallation (Preserves databases and vaults by default):**
+  ```powershell
+  .\uninstall_windows.bat
+  # Or alternatively non-interactive: python scripts\uninstall_windows.py --yes
+  ```
 
 ---
 
@@ -154,11 +219,16 @@ All project components reside under the canonical project root `D:\bit defender`
 ```
 D:\bit defender\
 ├── main.py                             # Unified application entry point (GUI / CLI)
-├── run_gui.bat                         # 1-Click Desktop GUI launcher
+├── run_gui.bat                         # 1-Click Desktop GUI dashboard launcher
 ├── run_cli.bat                         # 1-Click Command Line Interface launcher
-├── run_n8n.bat                         # 1-Click Genuine n8n Community Edition launcher
-├── run_tests.bat                       # 1-Click Automated test runner (42 unit tests)
-├── run_tests.py                        # Python test suite runner
+├── run_demo.bat                        # 1-Click 10-Stage synthetic live demonstration launcher
+├── run_tests.bat                       # 1-Click Automated test runner (276 tests across 44 suites)
+├── run_tests.py                        # Automated test suite discovery runner
+├── run_n8n.bat                         # 1-Click Local n8n automation bridge daemon (Port 5678)
+├── setup_windows.bat                   # 1-Click Windows setup and initialization wizard
+├── uninstall_windows.bat               # 1-Click Safe uninstallation wizard
+├── requirements.txt                    # Python dependencies specification
+├── .env.example                        # Clean environment template (No credentials)
 ├── bi_antivirus_health_monitor.json    # Sanitized n8n workflow definition
 ├── bi_antivirus/
 │   ├── config.py                       # Central configuration, file paths, and color themes
@@ -171,32 +241,43 @@ D:\bit defender\
 │   │   ├── engine.py                   # Master engine coordinator
 │   │   ├── scanner.py                  # Multi-threaded filesystem scanner
 │   │   ├── detector.py                 # Multi-layered threat detection heuristics
+│   │   ├── incident_graph.py           # Enterprise EDR cross-vector graph correlation
+│   │   ├── windows_compat.py           # Windows compatibility & kernel minifilter audit
 │   │   ├── dispatcher.py               # Sanitized event dispatcher
-│   │   ├── quarantine.py               # Reversible XOR encrypted vault manager
+│   │   ├── quarantine.py               # Authenticated AES-256 vault manager
 │   │   ├── scheduler.py                # Background recurring scan scheduler
 │   │   └── updater.py                  # Definition catalog updater
 │   ├── database/
 │   │   ├── signatures.py               # SQLite threat signature database
-│   │   └── history.py                  # SQLite scan and threat history store
+│   │   └── history.py                  # SQLite scan, incident, and telemetry store
 │   ├── monitors/
-│   │   ├── realtime.py                 # Real-time filesystem sentinel
+│   │   ├── realtime.py                 # Real-time Win32 filesystem sentinel
+│   │   ├── exploit_shield.py           # Memory mitigation & RWX page sentinel
+│   │   ├── usb_sentinel.py             # Removable media & BadUSB sentinel
+│   │   ├── firewall_monitor.py         # Windows Defender Firewall auditor & host isolation
+│   │   ├── encryption_manager.py       # BitLocker & TPM hardware sentinel
+│   │   ├── etw_telemetry.py            # Windows Event Tracing (ETW) probe
 │   │   ├── web_protection.py           # Web reputation and domain filter
-│   │   ├── firewall_monitor.py         # Windows Defender Firewall auditor
-│   │   └── voice_alert.py              # Voice alert text generator
-│   ├── ui/                             # Tkinter dark cyber themed views & widgets
-│   └── tests/                          # 6 automated test modules (42 unit tests)
+│   │   └── voice_alert.py              # Voice alert notification generator
+│   ├── ui/                             # Tkinter dark cyber themed views (13 views)
+│   └── tests/                          # 44 automated test suites (276 tests)
 ├── config/
 │   └── n8n/
 │       ├── n8n.env.example             # Safe placeholder environment template
 │       └── bi_antivirus_health_monitor.json # Sanitized workflow template
-├── integrations/
-│   └── templates/                      # 6 Sanitized workflow JSON templates
+├── docs/                               # 16 Comprehensive technical specifications & parity analyses
+├── submission/                         # 16 Official submission, audit, and handover guides
 ├── scripts/
-│   ├── start_api_server.py             # Dedicated REST API launcher
+│   ├── demo_full_lifecycle.py          # 10-stage synthetic live demonstration script
+│   ├── install_windows.py              # Automated environment and database initializer
+│   ├── package_windows.py              # Standalone distribution zip packager
+│   ├── uninstall_windows.py            # Safe uninstallation wizard script
+│   ├── verify_clean_acceptance.py      # Clean-slate local acceptance test runner
 │   └── n8n/                            # n8n management scripts (start, stop, sync)
 ├── data/                               # Local SQLite databases & settings (Excluded from Git)
 ├── quarantine/                         # Reversible encrypted .biq vault (Excluded from Git)
 ├── logs/                               # Structured audit and service logs (Excluded from Git)
+├── dist/                               # Distribution output archives (Excluded from Git)
 └── n8n/                                # Genuine n8n Community installation (Excluded from Git)
 ```
 
@@ -277,7 +358,7 @@ python main.py
 | Service | Target Port | Startup Command | Notes |
 | :--- | :---: | :--- | :--- |
 | **REST API Server** | `8765` | `& python "D:\bit defender\scripts\start_api_server.py"` | Serves engine telemetry & authenticated scan triggers |
-| **Automation Bridge** | `5678` | `& python -m bi_antivirus.api.n8n_daemon` | Translates dispatcher alerts to n8n webhooks |
+| **Automation Bridge** | `5678` | `& python -m bi_antivirus.api.n8n_daemon`<br/>*(or `.\run_n8n.bat`)* | Translates dispatcher alerts to n8n webhooks |
 | **n8n Community Editor** | `5679` | `powershell -ExecutionPolicy Bypass -File "D:\bit defender\scripts\n8n\start_n8n.ps1"` | Genuine n8n Web Editor UI |
 | **n8n Task Broker** | `5680` | Managed automatically by n8n daemon | Dedicated internal broker port preventing collision |
 
@@ -336,41 +417,41 @@ flowchart LR
 
 ## 11. Automated Test Results
 
-The platform includes a comprehensive 236-test automated validation suite executed across 40 test modules (`python run_tests.py`):
+The platform includes a comprehensive 276-test automated validation suite executed across 44 test suites (`python run_tests.py`):
 
 ```text
 ======================================================================
       BI ANTIVIRUS - AUTOMATED VALIDATION TEST SUITE
 ======================================================================
-Ran 236 tests in 166.651s
+Ran 276 tests in 101.295s
 
 OK
 ======================================================================
-Tests Run:      236
+Tests Run:      276
 Failures:       0
 Errors:         0
 Skipped:        0
-Overall Status: SUCCESS (100% PASS RATE - ALL 236 TESTS PASSED)
+Overall Status: SUCCESS (ALL TESTS PASSED)
 ======================================================================
 ```
 
-### Test Suite Breakdown
+### Test Suite Functional Coverage (44 Suites / 276 Tests)
 
-| Module | Tests | Focus Areas | Result |
-| :--- | :---: | :--- | :---: |
-| `test_crypto_deep.py` | 7 | Encrypt-then-MAC (EtM), IV randomness (no reuse), tamper detection across all fields, truncation resistance, corrupted padding handling, atomic file operations | **PASS** |
-| `test_authenticode.py` | 3 | Native `wintrust.WinVerifyTrust` signature verification, missing file rejection, UPX packer detection | **PASS** |
-| `test_behavioral.py` | 4 | Toolhelp32 process hierarchy, Word -> PowerShell anomaly, ransomware shadow deletion CLI, live NtQueryInformationProcess command-line extraction | **PASS** |
-| `test_ransomware_shield.py` | 3 | Hidden honeypot canary integrity, rapid 3-file mutation burst detection, ransom note drop interception | **PASS** |
-| `test_usb_sentinel.py` | 3 | Removable drive mounting detection, malicious autorun.inf execution, LNK shortcut hijacking worms | **PASS** |
-| `test_vulnerability.py` | 3 | UAC `EnableLUA` registry check, legacy SMBv1 EternalBlue vector, 5-control baseline audit computation | **PASS** |
-| `test_detector.py` | 6 | EICAR pattern matching, SHA-256 signatures, false-positive prevention, Shannon entropy, double extensions | **PASS** |
-| `test_scanner.py` | 4 | Traversal performance, folder custom scanning, scan_custom method alias, exclusion filtering, SQLite scan history logging | **PASS** |
-| `test_quarantine.py` | 5 | Authenticated AES-256-CBC + HMAC-SHA256 vault, AntivirusEngine coordination, legacy v1 backward compatibility, tamper detection failsafe, overwrite protection, safe purge | **PASS** |
-| `test_signatures.py` | 5 | Signature hash indexing, pattern compilation, web reputation lookups, JSON import/export | **PASS** |
-| `test_error_handling.py` | 4 | Inaccessible files, corrupted signature packs, nonexistent quarantine IDs, malformed URLs | **PASS** |
-| `test_integrations.py` | 14 | API key constant-time validation, rate limiting, REST endpoints, voice alerts, template schema validation | **PASS** |
-| `test_n8n_connectivity.py` | 8 | Daemon lifecycle, loopback rejection, webhook threat reception, workflow simulation | **PASS** |
+| Category / Subsystem | Suites | Tests | Focus Areas & Security Invariants |
+| :--- | :---: | :---: | :--- |
+| **Detection & Heuristics** | 5 | 28 | Streaming SHA-256/MD5 hashing, EICAR recognition, Shannon entropy, double extension blocking, false-positive benchmarking. |
+| **Cryptographic Security & Vault** | 3 | 17 | AES-256-CBC Encrypt-then-MAC (EtM), DPAPI master keys, atomic writes, tamper detection across all fields, legacy v1 XOR compatibility. |
+| **Behavioral & Exploit Shield** | 4 | 24 | Toolhelp32 process snapshotting, anomalous parent-child chains, PPID spoofing, memory mitigation sweeps, RWX private page detection. |
+| **Ransomware & Honeytokens** | 3 | 12 | Hidden canary honeypots, rapid mutation bursts ($\ge 3$ in 5s), extortion note interception, plaintext-to-ciphertext entropy transition tracking. |
+| **Removable Media & BadUSB** | 2 | 8 | Removable drive mounting, autorun.inf blocking, LNK shortcut hijacking worms, BadUSB ducky script payload analysis. |
+| **System Posture & Vulnerabilities** | 4 | 16 | Windows security baseline auditing (5 controls), patch inventory, BitLocker volume audit, registry enumeration. |
+| **Enterprise Policy & Fleet Control** | 6 | 45 | Monotonic policy distribution, rollback override protection, device control (ALLOW/BLOCK/READ_ONLY), application hash whitelisting. |
+| **EDR Incident Graph & Telemetry** | 5 | 32 | Normalized telemetry schema, cross-vector graph correlation, 14 MITRE tactics (TA0001–TA0043), RCA backtracking, ETW lifecycle differential. |
+| **Enterprise RBAC & SIEM Hash Chaining** | 2 | 16 | Multi-tier RBAC, session token lifecycle, CEF / RFC 5424 Syslog export, cryptographic hash chaining ($H_i = \text{SHA256}(H_{i-1} \parallel \text{entry}_i)$). |
+| **PKI, mTLS & Endpoint Enrollment** | 2 | 16 | Internal Root CA, mutual TLS certificate issuance, CN binding, 60s replay protection, hardware fingerprinting enrollment. |
+| **Local Machine Learning Engine** | 2 | 16 | 12-dimensional PE feature extraction, calibrated inference, HMAC model signing, anti-rollback version gating, emergency rollback. |
+| **API, Daemons & Integrations** | 4 | 36 | REST API constant-time token auth, rate limiting (60 req/min), n8n webhook bridge, voice alerts, template schema validation. |
+| **GUI Workflows & Diagnostics** | 2 | 16 | View bindings across 13 views, zero decorative dead buttons, online database backup/restore, crash recovery manager. |
 
 ---
 
@@ -388,27 +469,34 @@ Overall Status: SUCCESS (100% PASS RATE - ALL 236 TESTS PASSED)
 
 ## 13. Commercial Parity Boundaries & Realistic Limitations
 
-BI Antivirus is designed as a focused, lightweight, and sovereign endpoint security tool with autonomous workflow orchestration. While inspired by multi-layered defense architectures found in commercial products such as Bitdefender, **it does not claim full commercial parity**. Important engineering differences include:
+BI Antivirus is designed as an original, sovereign endpoint security tool with autonomous workflow orchestration. While inspired by multi-layered defense architectures found in commercial products such as Bitdefender GravityZone, **it does not claim 100% commercial feature parity or production certification**. Important engineering differences include:
 
-### 1. User-Space vs Kernel Driver Architecture
-- **Commercial AV (e.g., Bitdefender, Defender ATP)**: Utilize Microsoft-signed Windows Kernel Mini-Filter Drivers (FLTMGR) and Early Launch Anti-Malware (ELAM) drivers that intercept file I/O and process creation synchronously before execution occurs in ring 0.
-- **BI Antivirus**: Operates purely in **user-mode (ring 3)** using standard Win32 / NT APIs (`CreateToolhelp32Snapshot`, `NtQueryInformationProcess`, directory polling). This guarantees system stability and zero kernel crash risk, but introduces a sub-second observation window during rapid multi-file dropped payloads.
+### 1. User-Space vs Kernel Minifilter Driver Architecture
+- **Commercial EDR (e.g., Bitdefender, Defender ATP)**: Utilizes Microsoft-signed Windows Kernel Mini-Filter Drivers (`FLTMGR`) and Early Launch Anti-Malware (`ELAM`) drivers that intercept file I/O and process creation synchronously before execution occurs in ring 0.
+- **BI Antivirus**: Operates purely in **user-mode (ring 3)** using standard Win32 / NT APIs (`ReadDirectoryChangesW`, `CreateToolhelp32Snapshot`, `NtQueryInformationProcess`). This guarantees workstation stability and zero Blue Screen (BSOD) risk, but detection is near-instantaneous rather than synchronous pre-execution kernel interception.
 
-### 2. Local Threat Catalog vs Global Cloud Telemetry
-- **Commercial AV**: Relies on multi-billion sample cloud threat telemetry networks (e.g., Bitdefender Global Protective Network) with machine learning inference backends.
-- **BI Antivirus**: Operates on a **100% offline local signature catalog and local heuristic rules**, guaranteeing complete user privacy and data sovereignty without outbound cloud telemetry.
+### 2. Local Threat Catalog vs Global Cloud Threat Intelligence
+- **Commercial AV**: Queries multi-billion sample global cloud threat networks (e.g., Bitdefender Global Protective Network) with petabyte-scale cloud machine learning backends.
+- **BI Antivirus**: Operates on a **100% offline local signature catalog and local heuristic rules**, guaranteeing complete privacy and data sovereignty without outbound cloud telemetry. The cloud sandbox abstraction operates in truthful local simulation mode.
 
-### 3. Baseline Audit Score Definition (5-Control Audit)
-- The "100/100 Posture Score" represents passing **5 specific Windows security configuration baseline controls**:
-  1. UAC Protection (`EnableLUA == 1`)
-  2. Legacy SMBv1 Protocol Disabled (Mitigating EternalBlue)
-  3. Windows Defender Firewall Active across all profiles
-  4. Remote Desktop NLA (Network Level Authentication) Enforced
-  5. Windows Update Service Operational
-- **Scope Notice**: This is a configuration baseline audit score (5/5 controls passed), **not a claim of universal invulnerability** to unknown zero-day exploits.
+### 3. Unsigned Portable Distribution & Code Signing
+- **Commercial AV**: Distributed as digitally signed MSI / EXE installers bearing Microsoft Authenticode Extended Validation (EV) certificates with established Windows SmartScreen reputation and WHQL certification.
+- **BI Antivirus**: Built as an **unsigned portable distribution bundle (`.zip`)** for developer evaluation and academic review. Running on clean Windows systems may display standard SmartScreen unknown-publisher warnings.
 
-### 4. Cooperative Design Alongside Windows Defender
-- BI Antivirus never attempts to disable, replace, or fight native Windows Defender. It operates cooperatively as a secondary telemetry layer and autonomous workflow sentinel on the workstation.
+### 4. Host Firewall Management vs Deep Packet Inspection (NDIS/WFP)
+- **Commercial AV**: Deploys custom Windows Filtering Platform (WFP) or NDIS network filter drivers for deep packet inspection and protocol decoding.
+- **BI Antivirus**: Audits active Windows Defender Firewall profiles and applies host isolation rules via native `netsh advfirewall` CLI commands with pre-cached atomic rollbacks.
+
+### 5. Memory Exploit Shield vs Ring 0 Hooking / ELAM
+- **Commercial AV**: Hooks system calls and injects protected anti-exploit DLLs via kernel drivers to block ROP chains and heap spray attacks at runtime.
+- **BI Antivirus**: Audits process mitigation policies (DEP, ASLR, CFG) and sweeps memory regions via `VirtualQueryEx` for unbacked RWX pages, operating defensively without intrusive binary hooking.
+
+### 6. BitLocker Sentinel vs Central Cloud Key Escrow
+- **Commercial AV**: Centrally manages, escrow-stores, and forces BitLocker encryption keys into enterprise cloud directories.
+- **BI Antivirus**: Audits local BitLocker volume status, TPM chip presence, and encryption algorithms via `manage-bde.exe` / WMI in read-only mode without cloud key escrow.
+
+### 7. Parity Summary
+- **Granular Matrix**: **24 out of 30 capabilities** implemented in sovereign user-space; **6 capabilities** operate with documented sovereign user-space fallbacks due to kernel-driver or commercial cloud prerequisites. See [`docs/BITDEFENDER_GRAVITYZONE_COMPARISON.md`](file:///D:/bit%20defender/docs/BITDEFENDER_GRAVITYZONE_COMPARISON.md) and [`submission/FINAL_FEATURE_PARITY_MATRIX.md`](file:///D:/bit%20defender/submission/FINAL_FEATURE_PARITY_MATRIX.md) for full capability matrices.
 
 ---
 

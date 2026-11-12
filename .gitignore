@@ -76,6 +76,8 @@ env/
 venv/
 ENV/
 .pytest_cache/
+build/
+dist/
 
 # 10. Local User Reports (Preserve report generation scripts & docs)
 reports/*.md

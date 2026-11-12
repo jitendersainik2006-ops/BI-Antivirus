@@ -77,3 +77,27 @@ To prevent any misunderstanding by executive leadership or evaluating committees
   - **96.7% Sovereign User-Space Functional Scope Parity:** Evaluates the proportion of functional, demonstrable user-space software modules implemented on Windows (29 of 30 capabilities).
   - **84.2% Strict Commercial Weighted Parity:** Strictly penalizes user-space boundaries and local simulation against commercial enterprise kernel drivers (25.25 of 30.00 points).
 - **Conclusion:** These metrics reflect honest, rigorous defensive software engineering and must not be conflated with commercial vendor marketing claims.
+
+---
+
+## 5. Hardened Detection Boundaries & False-Positive Controls
+
+Following independent security audit and hardening (Sprint 16+ Parity Maximization), the following operational boundaries are strictly enforced:
+
+1. **NTFS Zone.Identifier Provenance Modifiers:**
+   - Alternate Data Stream (ADS) inspection is supported strictly on NTFS filesystems. Unsupported filesystems (FAT32, exFAT) and permission restrictions fail safe and return `None`.
+   - Internet origin (`ZoneId=3/4`) is strictly treated as an environmental risk factor and provenance telemetry modifier, never an automatic threat conviction.
+2. **Memory Exploit Shield Heuristic Classification:**
+   - Unbacked executable memory pages and PE `MZ` headers in private memory are classified as `SUSPICIOUS_HEURISTIC` posture indicators, not conclusive proof of malicious injection.
+   - Known JIT runtimes (Node.js, Python, Java, .NET, Chromium, PowerShell) are explicitly recognized to prevent false-positive alerts on dynamic code generation.
+   - Monitored processes are strictly inspected in read-only mode (`PROCESS_VM_READ | PROCESS_QUERY_INFORMATION`); zero code injection or process modification occurs.
+3. **Removable Media & LNK Shortcuts:**
+   - LNK parsing strictly differentiates weaponized command cradles (hidden windows, base64 encoded flags, download cradles) from benign administrative shortcuts pointing to system shells (`powershell.exe`, `cmd.exe`).
+   - Discovered commands and script payloads are never executed; parsing is 100% static byte and string pattern matching.
+4. **ETW Fallback Classification:**
+   - The user-space telemetry engine is accurately designated as the **Win32 Toolhelp32 Process Lifecycle Polling Engine**. It does not consume kernel `Microsoft-Windows-Threat-Intelligence` ETW events, which require Microsoft ELAM and PPL Antivirus EKU certificates.
+   - PID reuse is actively detected by monitoring differential changes in image name and parent PID between polling intervals.
+5. **Firewall Isolation Safety & Emergency Rollback:**
+   - Host network isolation enforces bidirectional management preservation (`BI-EDR-ISOLATE-MGMT-IN` and `BI-EDR-ISOLATE-MGMT-OUT`) alongside loopback and DNS/DHCP preservation to guarantee remote connectivity is never orphaned.
+   - Automated test suites enforce `dry_run=True` or `BI_TEST_MODE=1` to guarantee host network rules are never modified during automated validation.
+   - A standalone recovery script (`data/emergency_firewall_restore.bat`) is generated to allow manual operator recovery if the defensive daemon is terminated during isolation.

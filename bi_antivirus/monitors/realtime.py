@@ -258,40 +258,75 @@ class RealTimeGuard:
         """
         Inspect NTFS Zone.Identifier Alternate Data Stream (ADS) for internet ingress metadata.
         ZoneId:
-          0 = Local Machine
-          1 = Intranet
-          2 = Trusted Sites
-          3 = Internet (Untrusted download)
-          4 = Restricted Sites
+          0 = Local Machine (URLZONE_LOCAL_MACHINE)
+          1 = Intranet (URLZONE_INTRANET)
+          2 = Trusted Sites (URLZONE_TRUSTED)
+          3 = Internet / Untrusted download (URLZONE_INTERNET)
+          4 = Restricted Sites (URLZONE_UNTRUSTED)
+
+        Note: Internet provenance (ZoneId=3/4) is an environmental risk indicator and
+        provenance factor, not an automatic proof or declaration of malware.
         """
         if os.name != "nt":
             return None
-        ads_path = Path(str(file_path) + ":Zone.Identifier")
+
         try:
-            if not ads_path.exists():
+            p = Path(file_path)
+            # Ensure path exists and is a file before querying stream
+            if not p.exists() or not p.is_file():
                 return None
-            content = ads_path.read_text(encoding="utf-8", errors="ignore")
-            zone_id = 0
+
+            ads_path = Path(str(p) + ":Zone.Identifier")
+            # Filesystem check: on non-NTFS volumes or without stream permissions, exists() may fail
+            try:
+                if not ads_path.exists():
+                    return None
+            except (OSError, ValueError):
+                # Volume does not support ADS (e.g., FAT32/exFAT) or invalid filename
+                return None
+
+            try:
+                content = ads_path.read_text(encoding="utf-8", errors="ignore")
+            except (OSError, IOError, PermissionError):
+                return None
+
+            zone_id = -1
             host_url = ""
             referrer_url = ""
+
             for line in content.splitlines():
                 line = line.strip()
                 if line.startswith("ZoneId="):
                     try:
-                        zone_id = int(line.split("=", 1)[1])
-                    except ValueError:
-                        pass
+                        val = int(line.split("=", 1)[1].strip())
+                        if 0 <= val <= 4:
+                            zone_id = val
+                    except (ValueError, IndexError):
+                        zone_id = -1
                 elif line.startswith("HostUrl="):
-                    host_url = line.split("=", 1)[1]
+                    host_url = line.split("=", 1)[1].strip()
                 elif line.startswith("ReferrerUrl="):
-                    referrer_url = line.split("=", 1)[1]
+                    referrer_url = line.split("=", 1)[1].strip()
+
+            if zone_id == -1:
+                return None
+
+            zone_names = {
+                0: "Local Machine",
+                1: "Local Intranet",
+                2: "Trusted Sites",
+                3: "Internet",
+                4: "Restricted Sites",
+            }
 
             return {
                 "zone_id": zone_id,
-                "is_untrusted": zone_id >= 3,
-                "host_url": host_url,
-                "referrer_url": referrer_url,
-                "raw": content,
+                "zone_description": zone_names.get(zone_id, "Unknown"),
+                "is_untrusted": zone_id in (3, 4),
+                "host_url": host_url[:512],
+                "referrer_url": referrer_url[:512],
+                "raw": content[:1024],
+                "filesystem_supported": True,
             }
         except Exception:
             return None
@@ -343,8 +378,9 @@ class RealTimeGuard:
             if h_dir == -1 or not h_dir:
                 return
 
-            buf = ctypes.create_string_buffer(8192)
+            buf = ctypes.create_string_buffer(32768)
             bytes_ret = wintypes.DWORD(0)
+            retries = 0
 
             while not self._stop_event.is_set() and self.is_running:
                 success = k32.ReadDirectoryChangesW(
@@ -358,8 +394,13 @@ class RealTimeGuard:
                     None,
                 )
                 if not success or bytes_ret.value == 0:
-                    break
+                    retries += 1
+                    if retries > 3:
+                        break
+                    time.sleep(0.1)
+                    continue
 
+                retries = 0
                 offset = 0
                 while offset < bytes_ret.value:
                     next_off = int.from_bytes(buf[offset:offset+4], "little")
@@ -524,15 +565,20 @@ class RealTimeGuard:
             if not is_threat and (ext in (".exe", ".dll", ".sys") or (zone_info and zone_info.get("is_untrusted") and ext in (".bat", ".cmd", ".ps1", ".vbs", ".js", ".hta", ".scr"))):
                 try:
                     ml_pred = self.ml_engine.predict(file_path=file_path)
-                    prob_threshold = 0.65 if (zone_info and zone_info.get("is_untrusted")) else 0.85
-                    if ml_pred.verdict in ("MALICIOUS", "SUSPICIOUS") or ml_pred.probability >= prob_threshold:
+                    # Provenance modifier: internet ingress files undergo elevated scrutiny, but require substantive suspicion
+                    prob_threshold = 0.70 if (zone_info and zone_info.get("is_untrusted")) else 0.85
+                    if ml_pred.verdict == "MALICIOUS" or ml_pred.probability >= prob_threshold:
                         is_threat = True
                         result["is_threat"] = True
                         tag = "UntrustedIngress" if (zone_info and zone_info.get("is_untrusted")) else "SuspiciousPE"
                         result["threat_name"] = f"ML.Heuristics.{tag}.{ml_pred.model_version}"
                         result["threat_family"] = "MachineLearning"
-                        result["severity"] = "HIGH"
-                        result["description"] = f"Local ML inference flagged file (prob={ml_pred.probability:.2f}, zone={zone_info.get('zone_id') if zone_info else 'Local'})"
+                        result["severity"] = "HIGH" if ml_pred.probability >= 0.85 or ml_pred.verdict == "MALICIOUS" else "MEDIUM"
+                        zone_desc = zone_info.get("zone_description", "Local") if zone_info else "Local"
+                        result["description"] = (
+                            f"Local ML inference flagged file (prob={ml_pred.probability:.2f}, verdict={ml_pred.verdict}, "
+                            f"provenance={zone_desc}; heuristic indicator only)"
+                        )
                 except Exception as ex:
                     logger.debug(f"Real-time ML evaluation skipped: {ex}")
 

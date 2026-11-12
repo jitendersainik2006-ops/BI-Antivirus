@@ -141,3 +141,11 @@ graph LR
 | **VM Escape Exploit (Zero-Day)** | Critical | Guest runs unprivileged; host enforces strict AppArmor/SELinux (Linux) or Windows Defender Hyper-V Isolated Containers; hypervisor hosts patched automatically. |
 | **Denial of Service via Heavy Samples** | High | Hard per-sample resource quotas: max 2 CPU cores, 4 GB RAM, 120s timeout; kill switch triggered immediately on timeout. |
 | **C2 Leakage to Real Targets** | Severe | Strict firewall rule blocking all egress traffic except internal sinkholes; no live packets touch the public internet. |
+
+---
+
+## 9. Engineering Dependencies, Specialist Skills & Operational Boundary
+
+- **Infrastructure Requirements:** Bare-metal hypervisor cluster (Hyper-V / KVM), isolated air-gapped detonation VLAN, high-throughput NVMe storage with copy-on-write snapshot engines.
+- **Specialist Capabilities Required:** Hypervisor virtualization engineers, malware reverse engineers, sandbox orchestration and telemetry pipeline architects.
+- **Scope Distinction:** This document specifies an enterprise cloud or on-premises detonation cluster architecture. The current BI Antivirus repository provides lightweight user-space process-containment simulation for local validation, which does not replace full bare-metal hypervisor sandboxing.
