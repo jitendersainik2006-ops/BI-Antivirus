@@ -78,7 +78,9 @@ ENV/
 .pytest_cache/
 
 # 10. Local User Reports (Preserve report generation scripts & docs)
+reports/*.md
 reports/security_report_*.md
+reports/demo_edr_*.md
 reports/BI_ANTIVIRUS_N8N_VOICE_INTEGRATION_REPORT.md
 
 # 11. OS & IDE Metadata

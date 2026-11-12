@@ -15,6 +15,29 @@ All demonstration commands are **100% harmless, safe to execute on production Wi
 
 ---
 
+## Master Automated Demonstration (Zero-Effort Single Command)
+
+For an immediate, fully automated, end-to-end demonstration covering all 10 core lifecycle stages in ~8 seconds:
+
+```powershell
+cd "D:\bit defender"
+python scripts/demo_full_lifecycle.py
+```
+
+This master command executes and validates:
+1. **Engine Architecture & Storage Confinement Audit** (D: drive containment, DB initialization)
+2. **Multi-Vector Synthetic Scan** (Heuristics + Safe Signatures + Clean Baseline files)
+3. **Cryptographic Quarantine Vault Isolation** (AES-256-CBC + HMAC-SHA256 authenticated isolation)
+4. **Physical Vault Cryptographic Integrity Verification** (100% healthy, 0 corrupted records)
+5. **Historical Threat Audit & Persistent Logging** (ACID transaction persistence)
+6. **Reversible Safe File Restoration** (Byte-for-byte SHA-256 match, atomic overwrite protection)
+7. **EDR Incident Graph Analysis & MITRE ATT&CK Mapping** (Multi-vector correlation, T1059.001 & T1486)
+8. **Forensic Investigation & RCA Report Generation** (Executive summary, MITRE matrix, entity graph)
+9. **Database WAL Concurrency & Resilient Online Hot Backup** (`PRAGMA integrity_check: ok`, live snapshot)
+10. **Enterprise Fleet Telemetry & Zero-Trust Posture** (mTLS enrolled nodes, CIS compliance posture)
+
+---
+
 ## Step 1: Pre-Flight Environment Audit & Status Verification (1 Minute)
 
 **Objective:** Demonstrate automated environment discovery, Windows compatibility auditing, and CrashRecoveryManager single-instance lock handling.
