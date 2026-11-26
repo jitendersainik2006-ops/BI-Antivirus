@@ -1,7 +1,9 @@
 package com.biantivirus.security.model
 
+import java.util.UUID
+
 data class ScanResult(
-    val scanId: String,
+    val scanId: String = "SCAN-" + UUID.randomUUID().toString().substring(0, 8).uppercase(),
     val timestamp: Long = System.currentTimeMillis(),
     val fileName: String,
     val filePath: String,

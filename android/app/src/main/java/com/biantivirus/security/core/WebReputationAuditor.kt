@@ -82,7 +82,7 @@ class WebReputationAuditor {
 
         // 5. Homoglyph / Punycode International Domain Name check (xn--)
         if (domain.startsWith("xn--") || domain.contains(".xn--")) {
-            score += 30
+            score += 35
             reasons.add("Punycode encoded domain (potential homograph impersonation attack)")
         }
 

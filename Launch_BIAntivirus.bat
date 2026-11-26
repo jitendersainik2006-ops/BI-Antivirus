@@ -6,9 +6,11 @@ cd /d "%~dp0"
 :: Black Intel Cyber Defense Platform
 
 set "PY_EXE="
-if exist "%LOCALAPPDATA%\Programs\Python\Python312\pythonw.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python312\pythonw.exe"
+if exist "%LOCALAPPDATA%\Programs\Python\Python314\pythonw.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python314\pythonw.exe"
+if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python312\pythonw.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python312\pythonw.exe"
 if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python311\pythonw.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python311\pythonw.exe"
 if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python310\pythonw.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python310\pythonw.exe"
+if not defined PY_EXE if exist "%ProgramFiles%\Python314\pythonw.exe" set "PY_EXE=%ProgramFiles%\Python314\pythonw.exe"
 if not defined PY_EXE if exist "%ProgramFiles%\Python312\pythonw.exe" set "PY_EXE=%ProgramFiles%\Python312\pythonw.exe"
 if not defined PY_EXE if exist "%ProgramFiles%\Python311\pythonw.exe" set "PY_EXE=%ProgramFiles%\Python311\pythonw.exe"
 

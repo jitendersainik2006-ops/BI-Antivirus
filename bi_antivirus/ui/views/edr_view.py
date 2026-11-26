@@ -424,7 +424,8 @@ class EDRView(tk.Frame):
 
     def _populate_memory_tree(self, records: List[Dict[str, Any]]) -> None:
         self.mem_tree.delete(*self.mem_tree.get_children())
-        for a in records:
+        seen_iids = set()
+        for idx, a in enumerate(records):
             pid = a.get("pid", 0)
             name = a.get("process_name", "")
             dep = a.get("dep", {}).get("status_str") if isinstance(a.get("dep"), dict) else a.get("dep_status", "UNKNOWN")
@@ -435,10 +436,15 @@ class EDRView(tk.Frame):
             score = a.get("risk_score", 0)
             level = a.get("risk_level", "LOW" if score < 20 else ("MEDIUM" if score < 40 else "HIGH"))
 
+            iid = str(pid)
+            if iid in seen_iids or self.mem_tree.exists(iid):
+                iid = f"{pid}_{idx}"
+            seen_iids.add(iid)
+
             self.mem_tree.insert(
                 "",
                 "end",
-                iid=str(pid),
+                iid=iid,
                 values=(pid, name, dep, aslr, cfg, dyn, rwx, score, level),
             )
 
@@ -448,7 +454,7 @@ class EDRView(tk.Frame):
         if not selected:
             return
 
-        pid_str = selected[0]
+        pid_str = selected[0].split("_")[0]
         # Find item in cache
         item = next((a for a in self._memory_audit_results if str(a.get("pid")) == pid_str), None)
         if not item:
