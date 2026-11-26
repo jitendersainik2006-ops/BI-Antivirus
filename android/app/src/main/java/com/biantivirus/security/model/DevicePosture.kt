@@ -23,5 +23,9 @@ data class DevicePosture(
     val osVersion: String,
     val overallScore: Int,
     val statusText: String,
-    val checks: List<PostureCheckItem>
+    val checks: List<PostureCheckItem>,
+    val manufacturer: String = "Universal",
+    val cpuAbi: String = "arm64-v8a",
+    val isTablet: Boolean = false,
+    val manufacturerGuidance: String = ""
 )

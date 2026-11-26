@@ -142,6 +142,64 @@ class DevicePostureAuditor(private val context: Context) {
             )
         }
 
+        // 5. Battery Optimization & Background Execution Policy
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        val isIgnoringBatteryOptimizations = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            powerManager?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+        } else {
+            true
+        }
+
+        val mfg = Build.MANUFACTURER.lowercase(java.util.Locale.ROOT)
+        val mfgGuidance = when {
+            mfg.contains("samsung") -> "Samsung One UI: Go to Device Care > Battery > Background usage limits > Never sleeping apps > Add BI Antivirus."
+            mfg.contains("xiaomi") || mfg.contains("redmi") || mfg.contains("poco") -> "Xiaomi MIUI/HyperOS: Go to Security app > Manage apps > BI Antivirus > Toggle Autostart ON and set Battery Saver to 'No restrictions'."
+            mfg.contains("vivo") || mfg.contains("iqoo") -> "vivo/iQOO Funtouch/Origin: Go to Settings > Battery > Background power consumption > BI Antivirus > Allow high background power consumption."
+            mfg.contains("oneplus") || mfg.contains("oppo") || mfg.contains("realme") -> "ColorOS/OxygenOS: Go to Settings > Battery > More battery settings > Optimize battery use > BI Antivirus > Don't optimize."
+            mfg.contains("motorola") || mfg.contains("google") || mfg.contains("nothing") -> "Stock Android: Go to Settings > Apps > BI Antivirus > App battery usage > Select 'Unrestricted'."
+            else -> "Settings > Apps > BI Antivirus > Battery > Set to 'Unrestricted' or 'No restrictions' for persistent defense."
+        }
+
+        if (isIgnoringBatteryOptimizations) {
+            checks.add(
+                PostureCheckItem(
+                    checkId = "CHK-BAT-05",
+                    name = "Background Battery Policy",
+                    category = "Endpoint Reliability",
+                    status = CheckStatus.PASS,
+                    details = "Battery optimizations are unrestricted. Background watchdog and threat monitors function persistently.",
+                    recommendation = "Maintain current unrestricted battery configuration."
+                )
+            )
+        } else {
+            scoreAccumulator -= 10
+            checks.add(
+                PostureCheckItem(
+                    checkId = "CHK-BAT-05",
+                    name = "Background Battery Policy",
+                    category = "Endpoint Reliability",
+                    status = CheckStatus.WARN,
+                    details = "System battery management may restrict background file monitoring on ${Build.MANUFACTURER} devices.",
+                    recommendation = mfgGuidance
+                )
+            )
+        }
+
+        // 6. Universal Device Architecture & Hardware Capabilities
+        val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
+        val formFactor = if (isTablet) "Tablet / Large Screen" else "Smartphone"
+        val primaryAbi = Build.SUPPORTED_ABIS.firstOrNull() ?: "universal"
+        checks.add(
+            PostureCheckItem(
+                checkId = "CHK-ARCH-06",
+                name = "Hardware & Architecture",
+                category = "Platform Compatibility",
+                status = CheckStatus.PASS,
+                details = "$formFactor (${Build.MANUFACTURER} ${Build.MODEL}), ABI: $primaryAbi, Screen: ${context.resources.configuration.smallestScreenWidthDp}dp.",
+                recommendation = "Device architecture is 100% compatible with universal native execution."
+            )
+        )
+
         val finalScore = scoreAccumulator.coerceIn(0, 100)
         val statusText = when {
             finalScore >= 85 -> "SECURE"
@@ -155,7 +213,11 @@ class DevicePostureAuditor(private val context: Context) {
             osVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
             overallScore = finalScore,
             statusText = statusText,
-            checks = checks
+            checks = checks,
+            manufacturer = Build.MANUFACTURER,
+            cpuAbi = primaryAbi,
+            isTablet = isTablet,
+            manufacturerGuidance = mfgGuidance
         )
     }
 }
