@@ -121,4 +121,6 @@ releases/**/*.zip
 releases/Windows/Installer/*.exe
 releases/Android/*.apk
 !bi_antivirus/tests/fixtures/*.exe
+handover/
+handover/**
 
