@@ -80,6 +80,8 @@ build/
 dist/
 
 # 10. Local User Reports (Preserve report generation scripts & docs)
+reports/
+reports/**
 reports/*.md
 reports/security_report_*.md
 reports/demo_edr_*.md

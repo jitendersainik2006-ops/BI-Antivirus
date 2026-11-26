@@ -34,7 +34,7 @@ def main():
         # Default: Launch rich Desktop GUI Dashboard
         try:
             from bi_antivirus.ui.dashboard import run_dashboard
-            run_dashboard()
+            run_dashboard(show_splash=True)
         except Exception as e:
             print(f"[!] Unable to launch graphical desktop interface: {e}")
             print("[*] Falling back to CLI mode...")

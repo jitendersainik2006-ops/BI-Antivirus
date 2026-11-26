@@ -39,6 +39,14 @@ class FirstRunWizard(tk.Toplevel):
         self.configure(bg=THEME["bg_darkest"])
         self.resizable(False, False)
 
+        res_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+        ico_path = os.path.join(res_dir, "bi_antivirus.ico")
+        if os.path.exists(ico_path):
+            try:
+                self.iconbitmap(default=ico_path)
+            except Exception:
+                pass
+
         # Modal behavior
         self.transient(parent)
         self.grab_set()
@@ -134,14 +142,36 @@ class FirstRunWizard(tk.Toplevel):
         self.btn_back.pack_forget()
         self.btn_next.config(text="Get Started →")
 
-        # Hero Icon & Title
-        icon_lbl = tk.Label(
-            self.content_container,
-            text="🛡️",
-            bg=THEME["bg_darkest"],
-            font=(THEME["font_family"], 44),
-        )
-        icon_lbl.pack(pady=(10, 8))
+        # Hero Icon & Title with Official Black Intel Eagle Emblem
+        res_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+        emblem_128_path = os.path.join(res_dir, "black_intel_emblem_128.png")
+
+        self._welcome_emblem = None
+        if os.path.exists(emblem_128_path):
+            try:
+                self._welcome_emblem = tk.PhotoImage(file=emblem_128_path)
+                icon_lbl = tk.Label(
+                    self.content_container,
+                    image=self._welcome_emblem,
+                    bg=THEME["bg_darkest"],
+                )
+                icon_lbl.pack(pady=(6, 8))
+            except Exception:
+                icon_lbl = tk.Label(
+                    self.content_container,
+                    text="🛡️",
+                    bg=THEME["bg_darkest"],
+                    font=(THEME["font_family"], 44),
+                )
+                icon_lbl.pack(pady=(10, 8))
+        else:
+            icon_lbl = tk.Label(
+                self.content_container,
+                text="🛡️",
+                bg=THEME["bg_darkest"],
+                font=(THEME["font_family"], 44),
+            )
+            icon_lbl.pack(pady=(10, 8))
 
         title = tk.Label(
             self.content_container,
@@ -375,17 +405,39 @@ class FirstRunWizard(tk.Toplevel):
         self.btn_back.pack_forget()
         self.btn_next.config(text="Open Dashboard 🚀")
 
-        # Status badge
+        # Status badge with Official Black Intel Eagle Emblem
         badge_frame = tk.Frame(self.content_container, bg=THEME["bg_darkest"])
-        badge_frame.pack(pady=(20, 10))
+        badge_frame.pack(pady=(12, 10))
 
-        icon_lbl = tk.Label(
-            badge_frame,
-            text="🛡️",
-            bg=THEME["bg_darkest"],
-            font=(THEME["font_family"], 44),
-        )
-        icon_lbl.pack()
+        res_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+        emblem_64_path = os.path.join(res_dir, "black_intel_emblem_64.png")
+
+        self._finish_emblem = None
+        if os.path.exists(emblem_64_path):
+            try:
+                self._finish_emblem = tk.PhotoImage(file=emblem_64_path)
+                icon_lbl = tk.Label(
+                    badge_frame,
+                    image=self._finish_emblem,
+                    bg=THEME["bg_darkest"],
+                )
+                icon_lbl.pack()
+            except Exception:
+                icon_lbl = tk.Label(
+                    badge_frame,
+                    text="🛡️",
+                    bg=THEME["bg_darkest"],
+                    font=(THEME["font_family"], 44),
+                )
+                icon_lbl.pack()
+        else:
+            icon_lbl = tk.Label(
+                badge_frame,
+                text="🛡️",
+                bg=THEME["bg_darkest"],
+                font=(THEME["font_family"], 44),
+            )
+            icon_lbl.pack()
 
         status_lbl = tk.Label(
             self.content_container,

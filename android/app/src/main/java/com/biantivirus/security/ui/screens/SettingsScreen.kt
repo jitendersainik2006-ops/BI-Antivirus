@@ -1,5 +1,6 @@
 package com.biantivirus.security.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -13,8 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.biantivirus.security.R
 import com.biantivirus.security.storage.PreferencesManager
 import com.biantivirus.security.ui.theme.*
 
@@ -126,19 +129,34 @@ fun SettingsScreen(
                 .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
                 .padding(16.dp)
         ) {
-            Column {
-                Text(
-                    text = "Zero Cloud Telemetry Leakage",
-                    color = GoldAccent,
-                    fontSize = 14.sp,
-                    style = MaterialTheme.typography.titleSmall
+            Row(verticalAlignment = Alignment.Top) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_black_intel_emblem),
+                    contentDescription = "Black Intel Eagle Emblem",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "BI Antivirus runs 100% locally on your device. No document contents, hashes, filenames, or identity metrics are uploaded to external clouds. The engine operates entirely offline.",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(
+                        text = "Black Intel Cyber Defense",
+                        color = GoldAccent,
+                        fontSize = 15.sp,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Zero Cloud Telemetry Leakage • Enterprise v1.0.0",
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "BI Antivirus runs 100% locally on your device. No document contents, hashes, filenames, or identity metrics are uploaded to external clouds. The engine operates entirely offline.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
             }
         }
     }

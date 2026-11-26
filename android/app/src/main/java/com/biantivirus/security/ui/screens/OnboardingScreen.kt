@@ -1,5 +1,6 @@
 package com.biantivirus.security.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,10 +18,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.biantivirus.security.R
 import com.biantivirus.security.ui.theme.*
 
 @Composable
@@ -44,20 +47,20 @@ fun OnboardingScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Brand Crest Icon
+            // Brand Crest Icon - Official Black Intel Eagle Emblem
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(20.dp))
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(24.dp))
                     .background(BgCard)
-                    .border(2.dp, GoldAccent, RoundedCornerShape(20.dp)),
+                    .border(2.dp, GoldAccent, RoundedCornerShape(24.dp))
+                    .padding(8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Shield,
-                    contentDescription = "BI Shield",
-                    tint = GoldAccent,
-                    modifier = Modifier.size(48.dp)
+                Image(
+                    painter = painterResource(id = R.drawable.ic_black_intel_emblem),
+                    contentDescription = "Black Intel Eagle Emblem",
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 

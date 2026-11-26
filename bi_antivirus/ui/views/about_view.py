@@ -4,6 +4,7 @@ Comprehensive system information, engine versions, security architecture,
 and help information presented in a clean, user-friendly format.
 """
 
+import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 from pathlib import Path
@@ -37,18 +38,41 @@ class AboutView(tk.Frame):
         header_frame.pack(fill="x", padx=20, pady=(20, 15))
         header_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
 
-        # Brand row
+        # Brand row with Official Black Intel Eagle Emblem
         brand_row = tk.Frame(header_frame, bg=THEME["bg_panel"])
         brand_row.pack(fill="x")
 
-        logo_lbl = tk.Label(
-            brand_row,
-            text="🛡️",
-            bg=THEME["bg_panel"],
-            fg=THEME["accent_primary"],
-            font=(THEME["font_family"], 28),
-        )
-        logo_lbl.pack(side="left", padx=(0, 16))
+        res_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources")
+        emblem_path = os.path.join(res_dir, "black_intel_emblem_64.png")
+
+        self._emblem_img = None
+        if os.path.exists(emblem_path):
+            try:
+                self._emblem_img = tk.PhotoImage(file=emblem_path)
+                logo_lbl = tk.Label(
+                    brand_row,
+                    image=self._emblem_img,
+                    bg=THEME["bg_panel"],
+                )
+                logo_lbl.pack(side="left", padx=(0, 16))
+            except Exception:
+                logo_lbl = tk.Label(
+                    brand_row,
+                    text="🛡️",
+                    bg=THEME["bg_panel"],
+                    fg=THEME["accent_primary"],
+                    font=(THEME["font_family"], 28),
+                )
+                logo_lbl.pack(side="left", padx=(0, 16))
+        else:
+            logo_lbl = tk.Label(
+                brand_row,
+                text="🛡️",
+                bg=THEME["bg_panel"],
+                fg=THEME["accent_primary"],
+                font=(THEME["font_family"], 28),
+            )
+            logo_lbl.pack(side="left", padx=(0, 16))
 
         info_col = tk.Frame(brand_row, bg=THEME["bg_panel"])
         info_col.pack(side="left", fill="both", expand=True)

@@ -4,6 +4,7 @@ Bitdefender-inspired modern cyber dark control center with streamlined 7-section
 navigation, real-time telemetry updates, and seamless view swapping.
 """
 
+import os
 import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -51,6 +52,15 @@ class AntivirusDashboard(tk.Tk):
         self.minsize(980, 650)
         self.configure(bg=THEME["bg_darkest"])
 
+        # Official Black Intel Application & Window Icon
+        res_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+        ico_path = os.path.join(res_dir, "bi_antivirus.ico")
+        if os.path.exists(ico_path):
+            try:
+                self.iconbitmap(default=ico_path)
+            except Exception:
+                pass
+
         apply_theme(self)
 
         self.nav_buttons: Dict[str, ttk.Button] = {}
@@ -78,13 +88,29 @@ class AntivirusDashboard(tk.Tk):
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.pack_propagate(False)
 
-        # Sidebar Branding Header
-        brand_frame = tk.Frame(self.sidebar, bg=THEME["bg_dark"], padx=16, pady=20)
+        # Sidebar Branding Header with Official Black Intel Eagle Emblem
+        brand_frame = tk.Frame(self.sidebar, bg=THEME["bg_dark"], padx=16, pady=16)
         brand_frame.pack(fill="x")
+
+        res_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources")
+        emblem_64_path = os.path.join(res_dir, "black_intel_emblem_64.png")
+
+        self._brand_emblem_img = None
+        if os.path.exists(emblem_64_path):
+            try:
+                self._brand_emblem_img = tk.PhotoImage(file=emblem_64_path)
+                emblem_lbl = tk.Label(
+                    brand_frame,
+                    image=self._brand_emblem_img,
+                    bg=THEME["bg_dark"],
+                )
+                emblem_lbl.pack(anchor="w", pady=(0, 6))
+            except Exception:
+                pass
 
         logo_lbl = tk.Label(
             brand_frame,
-            text="🛡️ BI ANTIVIRUS",
+            text="BI ANTIVIRUS",
             bg=THEME["bg_dark"],
             fg=THEME["accent_primary"],
             font=(THEME["font_family"], 13, "bold"),
@@ -337,10 +363,26 @@ class AntivirusDashboard(tk.Tk):
         self.destroy()
 
 
-def run_dashboard():
+def run_dashboard(show_splash: bool = False):
     """Launch the BI Antivirus desktop graphical dashboard."""
     app = AntivirusDashboard()
-    app.check_first_run(auto_prompt=True)
+    if show_splash:
+        try:
+            from bi_antivirus.ui.splash import SplashScreen
+            app.withdraw()
+
+            def _on_splash_done():
+                app.deiconify()
+                app.lift()
+                app.focus_force()
+                app.check_first_run(auto_prompt=True)
+
+            SplashScreen(app, on_complete=_on_splash_done, duration_ms=1200)
+        except Exception:
+            app.deiconify()
+            app.check_first_run(auto_prompt=True)
+    else:
+        app.check_first_run(auto_prompt=True)
     app.mainloop()
 
 
