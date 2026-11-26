@@ -1,0 +1,16 @@
+{
+  "package_name": "BI-Antivirus-Enterprise-Windows-x64",
+  "version": "1.0.0",
+  "build_date": "2026-11-12",
+  "target_arch": "x64",
+  "target_os": "Windows 10 / 11 / Server 2019+",
+  "package_type": "Standalone Portable Distribution Bundle",
+  "has_pyinstaller_binary": false,
+  "is_digitally_signed": false,
+  "code_signing_notice": "Requires Microsoft Authenticode EV Code Signing Certificate for SmartScreen reputation",
+  "zip_archive": "D:\\bit defender\\dist\\BI_Antivirus_Enterprise_v1.0.0_Portable.zip",
+  "zip_size_mb": 0.81,
+  "total_files_packaged": 278,
+  "zip_sha256": "8ff2db14df0ad46d40130cfde6d866ca72fe97722f757fbe5059d52bbcab4b28",
+  "zip_size_bytes": 852336
+}

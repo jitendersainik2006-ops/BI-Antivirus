@@ -1,0 +1,90 @@
+{
+  "catalog_version": "2026.11.1",
+  "platform": "mobile",
+  "generated_at": "2026-11-14T00:00:00Z",
+  "signatures": [
+    {
+      "id": "SIG-MOB-001",
+      "name": "EICAR-Standard-AV-Test-File",
+      "family": "TestVirus",
+      "severity": "CRITICAL",
+      "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+      "md5": "44d88612fea8a8f36de82e1278abb02f",
+      "description": "Industry standard European Institute for Computer Antivirus Research harmless test sample."
+    },
+    {
+      "id": "SIG-MOB-002",
+      "name": "Android.Trojan.FakeBank.A",
+      "family": "Trojan",
+      "severity": "CRITICAL",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "md5": "d41d8cd98f00b204e9800998ecf8427e",
+      "description": "Simulated banking credential phishing dropper signature."
+    },
+    {
+      "id": "SIG-MOB-003",
+      "name": "Android.Spyware.PegasusSim.Test",
+      "family": "Spyware",
+      "severity": "CRITICAL",
+      "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "md5": "ef597f63c5c766360ee718795b00f417",
+      "description": "Simulated surveillance spyware payload test vector."
+    },
+    {
+      "id": "SIG-MOB-004",
+      "name": "Mobile.Adware.HiddenAds.B",
+      "family": "Adware",
+      "severity": "MEDIUM",
+      "sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "md5": "c4ca4238a0b923820dcc509a6f75849b",
+      "description": "Aggressive background advertising and click-fraud payload."
+    },
+    {
+      "id": "SIG-MOB-005",
+      "name": "Android.Ransomware.Simplocker.Sim",
+      "family": "Ransomware",
+      "severity": "CRITICAL",
+      "sha256": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+      "md5": "900150983cd24fb0d6963f7d28e17f72",
+      "description": "Simulated mobile file encrypting extortion Trojan."
+    },
+    {
+      "id": "SIG-MOB-006",
+      "name": "iOS.Phishing.ConfigProfile.Dropper",
+      "family": "Trojan",
+      "severity": "HIGH",
+      "sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+      "md5": "b10a8db164e0754105b7a99be72e3fe5",
+      "description": "Malicious mobile configuration profile payload (.mobileconfig)."
+    },
+    {
+      "id": "SIG-MOB-007",
+      "name": "Mobile.Dropper.AnomalousPayload",
+      "family": "Dropper",
+      "severity": "HIGH",
+      "sha256": "8a8353e4c5b3941444d32e92cbb412ab3b5f939e944b20a322e70e9095fb8701",
+      "md5": "d95679752134a2d9eb61dbd7b91c4bcc",
+      "description": "Suspicious multi-stage APK payload wrapper."
+    }
+  ],
+  "heuristic_rules": {
+    "entropy_threshold": 7.2,
+    "max_file_size_mb": 150,
+    "suspicious_double_extensions": [
+      ".pdf.apk",
+      ".jpg.apk",
+      ".png.apk",
+      ".doc.apk",
+      ".pdf.ipa",
+      ".mp4.apk"
+    ],
+    "high_risk_extensions": [
+      ".apk",
+      ".dex",
+      ".so",
+      ".mobileconfig",
+      ".ipa",
+      ".dylib"
+    ]
+  }
+}

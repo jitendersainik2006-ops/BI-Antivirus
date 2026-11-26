@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BIAntivirusDevicePostureReport",
+  "type": "object",
+  "required": [
+    "report_id",
+    "timestamp",
+    "platform",
+    "device_model",
+    "os_version",
+    "overall_score",
+    "posture_status",
+    "checks"
+  ],
+  "properties": {
+    "report_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["windows", "android", "ios"]
+    },
+    "device_model": {
+      "type": "string"
+    },
+    "os_version": {
+      "type": "string"
+    },
+    "overall_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "posture_status": {
+      "type": "string",
+      "enum": ["SECURE", "WARNING", "AT_RISK"]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check_id", "name", "category", "status", "recommendation"],
+        "properties": {
+          "check_id": { "type": "string" },
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "status": { "type": "string", "enum": ["PASS", "WARN", "FAIL", "NOT_APPLICABLE"] },
+          "details": { "type": "string" },
+          "recommendation": { "type": "string" }
+        }
+      }
+    }
+  }
+}

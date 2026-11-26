@@ -13,6 +13,7 @@ from bi_antivirus.ui.views.edr_view import EDRView
 from bi_antivirus.ui.views.patch_view import PatchView
 from bi_antivirus.ui.views.pe_view import PEClassifierView
 from bi_antivirus.ui.views.fleet_view import FleetView
+from bi_antivirus.ui.views.about_view import AboutView
 
 __all__ = [
     "OverviewView",
@@ -28,4 +29,5 @@ __all__ = [
     "PatchView",
     "PEClassifierView",
     "FleetView",
+    "AboutView",
 ]

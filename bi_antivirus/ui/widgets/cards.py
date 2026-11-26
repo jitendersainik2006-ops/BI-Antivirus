@@ -170,3 +170,53 @@ class ActionCard(tk.Frame):
 
         btn = ttk.Button(self, text=button_text, style="Primary.TButton", command=on_click)
         btn.pack(fill="x", side="bottom")
+
+
+class EmptyStateCard(tk.Frame):
+    """Clean, friendly empty state display for empty tables/vaults."""
+
+    def __init__(
+        self,
+        parent,
+        icon: str,
+        title: str,
+        message: str,
+        action_text: Optional[str] = None,
+        on_action: Optional[Callable[[], None]] = None,
+        **kwargs,
+    ):
+        super().__init__(parent, bg=THEME["bg_input"], padx=20, pady=24, **kwargs)
+        self.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        icon_lbl = tk.Label(
+            self,
+            text=icon,
+            bg=THEME["bg_input"],
+            fg=THEME["accent_primary"],
+            font=(THEME["font_family"], 24),
+        )
+        icon_lbl.pack(pady=(0, 6))
+
+        title_lbl = tk.Label(
+            self,
+            text=title,
+            bg=THEME["bg_input"],
+            fg=THEME["text_primary"],
+            font=(THEME["font_family"], 11, "bold"),
+        )
+        title_lbl.pack(pady=(0, 4))
+
+        msg_lbl = tk.Label(
+            self,
+            text=message,
+            bg=THEME["bg_input"],
+            fg=THEME["text_muted"],
+            font=(THEME["font_family"], 9),
+            wraplength=400,
+            justify="center",
+        )
+        msg_lbl.pack(pady=(0, 10))
+
+        if action_text and on_action:
+            act_btn = ttk.Button(self, text=action_text, style="Secondary.TButton", command=on_action)
+            act_btn.pack()

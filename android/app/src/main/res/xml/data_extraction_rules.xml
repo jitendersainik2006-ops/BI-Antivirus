@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Do not upload quarantine vault or local security databases to cloud backup -->
+        <exclude domain="file" path="quarantine" />
+        <exclude domain="database" path="databases" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="quarantine" />
+    </device-transfer>
+</data-extraction-rules>

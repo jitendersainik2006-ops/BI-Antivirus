@@ -1,7 +1,7 @@
 """
 BI Antivirus - Desktop Dashboard Main Window
-Bitdefender-inspired dark cyber control center with sidebar navigation,
-real-time telemetry updates, and seamless view swapping.
+Bitdefender-inspired modern cyber dark control center with streamlined 7-section
+navigation, real-time telemetry updates, and seamless view swapping.
 """
 
 import sys
@@ -34,6 +34,7 @@ from bi_antivirus.ui.views.edr_view import EDRView
 from bi_antivirus.ui.views.patch_view import PatchView
 from bi_antivirus.ui.views.pe_view import PEClassifierView
 from bi_antivirus.ui.views.fleet_view import FleetView
+from bi_antivirus.ui.views.about_view import AboutView
 
 
 class AntivirusDashboard(tk.Tk):
@@ -105,21 +106,15 @@ class AntivirusDashboard(tk.Tk):
         div = tk.Frame(self.sidebar, bg=THEME["border"], height=1)
         div.pack(fill="x", padx=14, pady=(0, 14))
 
-        # Nav Items
+        # Intuitive 7-Section Navigation (Beginner-friendly & streamlined)
         nav_items = [
             ("dashboard", "🛡️  Dashboard"),
-            ("scan", "🔍  Scan Center"),
+            ("scan", "🔍  Scan"),
             ("quarantine", "📦  Quarantine Vault"),
             ("history", "📜  Threat History"),
-            ("protection", "🌐  Real-Time & Web"),
-            ("firewall", "🔥  Firewall & Network"),
-            ("automation", "⚡  Automation & Voice"),
-            ("settings", "⚙️  Settings & Exclusions"),
-            ("reports", "📊  Security Reports"),
-            ("edr", "🧠  EDR & Exploit Shield"),
-            ("patch", "📦  Software & Patching"),
-            ("pe_inspect", "🔬  PE Static Inspector"),
-            ("fleet", "🏢  Enterprise Fleet"),
+            ("protection", "🌐  Protection"),
+            ("settings", "⚙️  Settings"),
+            ("about", "ℹ️  About"),
         ]
 
         for key, label in nav_items:
@@ -129,7 +124,7 @@ class AntivirusDashboard(tk.Tk):
                 style="Nav.TButton",
                 command=lambda k=key: self.show_view(k),
             )
-            btn.pack(fill="x", padx=10, pady=2)
+            btn.pack(fill="x", padx=10, pady=3)
             self.nav_buttons[key] = btn
 
         # Sidebar Bottom Footer
@@ -172,7 +167,7 @@ class AntivirusDashboard(tk.Tk):
         self.content_area = tk.Frame(self, bg=THEME["bg_darkest"])
         self.content_area.grid(row=0, column=1, sticky="nsew")
 
-        # Instantiate View Frames
+        # Instantiate View Frames (Preserving 100% of existing views for full compatibility)
         self.views = {
             "dashboard": OverviewView(
                 self.content_area,
@@ -180,19 +175,28 @@ class AntivirusDashboard(tk.Tk):
                 on_start_quick_scan=self.launch_quick_scan,
                 on_start_full_scan=self.launch_full_scan,
                 on_start_custom_scan=self.launch_custom_scan,
+                on_navigate=self.show_view,
             ),
-            "scan": ScanView(self.content_area, engine=self.engine),
+            "scan": ScanView(
+                self.content_area,
+                engine=self.engine,
+                on_start_quick_scan=self.launch_quick_scan,
+                on_start_full_scan=self.launch_full_scan,
+                on_start_custom_scan=self.launch_custom_scan,
+                on_navigate=self.show_view,
+            ),
             "quarantine": QuarantineView(self.content_area, engine=self.engine),
             "history": HistoryView(self.content_area, engine=self.engine),
             "protection": ProtectionView(self.content_area, engine=self.engine),
             "firewall": FirewallView(self.content_area, engine=self.engine),
             "automation": AutomationView(self.content_area, engine=self.engine),
-            "settings": SettingsView(self.content_area, engine=self.engine),
+            "settings": SettingsView(self.content_area, engine=self.engine, on_navigate=self.show_view),
             "reports": ReportsView(self.content_area, engine=self.engine),
             "edr": EDRView(self.content_area, engine=self.engine),
             "patch": PatchView(self.content_area, engine=self.engine),
             "pe_inspect": PEClassifierView(self.content_area, engine=self.engine),
             "fleet": FleetView(self.content_area, engine=self.engine),
+            "about": AboutView(self.content_area, engine=self.engine),
         }
 
     def _setup_engine_callbacks(self) -> None:
@@ -231,9 +235,21 @@ class AntivirusDashboard(tk.Tk):
         for v in self.views.values():
             v.pack_forget()
 
+        # Determine which sidebar nav button to highlight
+        parent_map = {
+            "firewall": "protection",
+            "edr": "protection",
+            "reports": "protection",
+            "automation": "settings",
+            "patch": "settings",
+            "pe_inspect": "settings",
+            "fleet": "settings",
+        }
+        active_nav_key = parent_map.get(view_key, view_key)
+
         # Update Nav Button styling
         for k, btn in self.nav_buttons.items():
-            if k == view_key:
+            if k == active_nav_key:
                 btn.configure(style="NavActive.TButton")
             else:
                 btn.configure(style="Nav.TButton")
@@ -286,6 +302,32 @@ class AntivirusDashboard(tk.Tk):
             pass
         self.after(5000, self._schedule_periodic_refresh)
 
+    def check_first_run(self, auto_prompt: bool = True) -> None:
+        """Check if first-run setup has occurred; launch wizard if needed."""
+        try:
+            from bi_antivirus.config import load_settings
+            settings = load_settings()
+            if not settings.get("first_run_completed", False):
+                if auto_prompt:
+                    self.after(300, self.open_first_run_wizard)
+        except Exception:
+            pass
+
+    def open_first_run_wizard(self) -> None:
+        """Open the modal First-Run Setup Wizard."""
+        try:
+            from bi_antivirus.ui.first_run_wizard import FirstRunWizard
+            FirstRunWizard(self, on_complete=self._on_wizard_complete)
+        except Exception as e:
+            print(f"[!] Unable to launch first run wizard: {e}")
+
+    def _on_wizard_complete(self, run_quick_scan: bool) -> None:
+        """Callback when the user completes first-run setup."""
+        if run_quick_scan:
+            self.show_view("scan")
+            if "scan" in self.views and hasattr(self.views["scan"], "_on_start_quick_scan"):
+                self.after(400, self.views["scan"]._on_start_quick_scan)
+
     def _on_close(self) -> None:
         """Handle application close event cleanly."""
         try:
@@ -298,6 +340,7 @@ class AntivirusDashboard(tk.Tk):
 def run_dashboard():
     """Launch the BI Antivirus desktop graphical dashboard."""
     app = AntivirusDashboard()
+    app.check_first_run(auto_prompt=True)
     app.mainloop()
 
 

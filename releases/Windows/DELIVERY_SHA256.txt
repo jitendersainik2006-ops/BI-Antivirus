@@ -1,0 +1,13 @@
+================================================================================
+BI ANTIVIRUS ENTERPRISE — SIR DELIVERY PACKAGE SHA-256 MANIFEST
+Package Version: 1.0.0 (Release Build: 2026-11-12)
+Generated for Sir's Independent Windows Evaluation
+================================================================================
+
+8ff2db14df0ad46d40130cfde6d866ca72fe97722f757fbe5059d52bbcab4b28      852336 bytes  BI_Antivirus_Enterprise_v1.0.0_Portable.zip
+1338b8f91be0e4f02374f6e4f38e261576dbbf833d6200c1811491da46e8bb78        8556 bytes  SIR_README_FIRST.md
+eacbee930304845f153a72d3d85265a83df561a76a2bf67e268d61a099f6bc59        6229 bytes  Documentation\SIR_HANDOVER_GUIDE.md
+7df71784df520194e4bfca78185430ea197bd955d0f8ff31515df5a9f79cfa13        4240 bytes  Documentation\FRESH_WINDOWS_INSTALLATION_CHECKLIST.md
+628d5828fa06972134cd91e93c9633083061c6dcbe77812d79bd345c30436091        5051 bytes  Documentation\PORTABLE_PACKAGE_AUDIT.md
+f6baa1c5114794058ca93969ea5337bcbc4ef0f73aed2f5056026587488f1d4f        6023 bytes  Documentation\FINAL_RELEASE_STATUS.md
+c7e58bf6a949061b39f26c85545176ca37f2e645d2cc7bca1cb18ecf3bed155c       19070 bytes  Documentation\FINAL_PRE_PUBLICATION_REVIEW.md

@@ -23,6 +23,7 @@ class OverviewView(tk.Frame):
         on_start_quick_scan: Callable[[], None],
         on_start_full_scan: Callable[[], None],
         on_start_custom_scan: Callable[[Path], None],
+        on_navigate: Optional[Callable[[str], None]] = None,
         **kwargs,
     ):
         super().__init__(parent, bg=THEME["bg_darkest"], **kwargs)
@@ -30,8 +31,13 @@ class OverviewView(tk.Frame):
         self.on_start_quick_scan = on_start_quick_scan
         self.on_start_full_scan = on_start_full_scan
         self.on_start_custom_scan = on_start_custom_scan
+        self.on_navigate = on_navigate
 
         self._build_ui()
+
+    def _navigate(self, target: str) -> None:
+        if self.on_navigate:
+            self.on_navigate(target)
 
     def _build_ui(self) -> None:
         # 1. Main Protection Hero Banner
@@ -76,6 +82,30 @@ class OverviewView(tk.Frame):
             anchor="w",
         )
         self.status_meta.pack(fill="x")
+
+        # Hero Action (Prominent Quick Scan Button)
+        hero_action = tk.Frame(hero_frame, bg=THEME["bg_panel"])
+        hero_action.pack(side="right", padx=(16, 0))
+
+        self.btn_hero_quick_scan = ttk.Button(
+            hero_action,
+            text="⚡ Run Quick Scan",
+            style="Primary.TButton",
+            command=self.on_start_quick_scan,
+        )
+        self.btn_hero_quick_scan.pack(fill="x", pady=(0, 4))
+
+        quick_sub = tk.Label(
+            hero_action,
+            text="Memory & startup scan",
+            bg=THEME["bg_panel"],
+            fg=THEME["text_muted"],
+            font=(THEME["font_family"], 8),
+            wraplength=140,
+            justify="center",
+            anchor="center",
+        )
+        quick_sub.pack(fill="x")
 
         # 1.25 Operating Privilege & Enforcement Mode Banner
         self.enforcement_frame = tk.Frame(self, bg=THEME["bg_panel"], padx=16, pady=10)
@@ -132,7 +162,7 @@ class OverviewView(tk.Frame):
             ("usb", "🔌 USB: ACTIVE"),
             ("authenticode", "🔏 Authenticode: ACTIVE"),
             ("posture", "🎯 Baseline: 5/5 PASSED"),
-            ("etw", "📡 ETW: DIAGNOSTIC PROBE"),
+            ("etw", "📡 ETW: AUDIT"),
         ]
 
         for key, text in sentinel_configs:
@@ -143,7 +173,7 @@ class OverviewView(tk.Frame):
                 fg=THEME["accent_cyan"],
                 font=(THEME["font_family"], 8, "bold"),
             )
-            lbl.pack(side="left", padx=(0, 10))
+            lbl.pack(side="left", padx=(0, 6))
             self.sentinel_labels[key] = lbl
 
         # 2. Metric Stat Cards Grid
@@ -239,6 +269,59 @@ class OverviewView(tk.Frame):
         )
         card_custom.grid(row=0, column=2, sticky="nsew", padx=(10, 0))
 
+        # 4. Quick Feature Shortcuts
+        shortcuts_lbl = tk.Label(
+            self,
+            text="IMPORTANT FEATURES & SHORTCUTS",
+            bg=THEME["bg_darkest"],
+            fg=THEME["text_secondary"],
+            font=(THEME["font_family"], 10, "bold"),
+            anchor="w",
+        )
+        shortcuts_lbl.pack(fill="x", padx=20, pady=(5, 8))
+
+        shortcuts_grid = tk.Frame(self, bg=THEME["bg_darkest"])
+        shortcuts_grid.pack(fill="x", padx=20, pady=(0, 20))
+        shortcuts_grid.columnconfigure(0, weight=1)
+        shortcuts_grid.columnconfigure(1, weight=1)
+        shortcuts_grid.columnconfigure(2, weight=1)
+        shortcuts_grid.columnconfigure(3, weight=1)
+
+        self.btn_nav_quarantine = ttk.Button(
+            shortcuts_grid,
+            text="📦 Quarantine Vault",
+            style="Secondary.TButton",
+            command=lambda: self._navigate("quarantine"),
+        )
+        self.btn_nav_quarantine.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
+        self.btn_nav_protection = ttk.Button(
+            shortcuts_grid,
+            text="🌐 Protection Shields",
+            style="Secondary.TButton",
+            command=lambda: self._navigate("protection"),
+        )
+        self.btn_nav_protection.grid(row=0, column=1, sticky="ew", padx=5)
+
+        self.btn_nav_history = ttk.Button(
+            shortcuts_grid,
+            text="📜 Threat History",
+            style="Secondary.TButton",
+            command=lambda: self._navigate("history"),
+        )
+        self.btn_nav_history.grid(row=0, column=2, sticky="ew", padx=5)
+
+        self.btn_nav_settings = ttk.Button(
+            shortcuts_grid,
+            text="⚙️ Settings & Exclusions",
+            style="Secondary.TButton",
+            command=lambda: self._navigate("settings"),
+        )
+        self.btn_nav_settings.grid(row=0, column=3, sticky="ew", padx=(5, 0))
+
+        # Initial data refresh from active engine state
+        self.refresh_data()
+
     def _prompt_custom_scan(self) -> None:
         """Open folder dialog to select custom scan target."""
         folder = filedialog.askdirectory(title="Select Folder to Scan with BI Antivirus")
@@ -293,8 +376,9 @@ class OverviewView(tk.Frame):
             if "etw" in self.sentinel_labels:
                 etw_info = summary.get("etw_status", {})
                 etw_op = etw_info.get("operational_status", "PROBE")
+                etw_short = "ACTIVE" if "PERMITTED" in etw_op else "AUDIT"
                 self.sentinel_labels["etw"].config(
-                    text=f"📡 ETW: {etw_op}",
+                    text=f"📡 ETW: {etw_short}",
                     fg=THEME["status_safe"] if "PERMITTED" in etw_op else THEME["accent_cyan"],
                 )
 

@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">BI Antivirus</string>
+    <string name="app_tagline">Sovereign Cyber Defense Platform</string>
+    <string name="dashboard_title">Security Dashboard</string>
+    <string name="scan_file_action">Scan Document</string>
+    <string name="scan_folder_action">Scan Directory</string>
+    <string name="posture_audit_action">Audit Posture</string>
+    <string name="quarantine_vault_title">Quarantine Vault</string>
+    <string name="scan_history_title">Scan History</string>
+    <string name="status_protected">DEVICE PROTECTED</string>
+    <string name="status_warning">ATTENTION REQUIRED</string>
+    <string name="status_threat">THREATS DETECTED</string>
+</resources>

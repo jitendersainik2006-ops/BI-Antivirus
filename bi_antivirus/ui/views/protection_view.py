@@ -1,18 +1,22 @@
 """
-BI Antivirus - Real-Time & Web Protection View
-Controls background filesystem guard, monitored directory locations,
-and provides on-demand URL and domain reputation checking.
+BI Antivirus - Protection Shield View
+Comprehensive protection hub providing Real-Time Filesystem Guard,
+Web & URL Reputation filtering, Firewall & Network defense, and EDR threat hunting.
 """
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
+from typing import Optional
 
 from bi_antivirus.config import THEME, load_settings, save_settings
+from bi_antivirus.ui.views.firewall_view import FirewallView
+from bi_antivirus.ui.views.edr_view import EDRView
+from bi_antivirus.ui.views.reports_view import ReportsView
 
 
 class ProtectionView(tk.Frame):
-    """Real-Time sentinel controls and interactive web reputation shield."""
+    """Integrated multi-layer protection console organizing Real-Time, Web, Firewall, and EDR."""
 
     def __init__(self, parent, engine, **kwargs):
         super().__init__(parent, bg=THEME["bg_darkest"], **kwargs)
@@ -21,12 +25,12 @@ class ProtectionView(tk.Frame):
 
     def _build_ui(self) -> None:
         header_frame = tk.Frame(self, bg=THEME["bg_panel"], padx=20, pady=16)
-        header_frame.pack(fill="x", padx=20, pady=(20, 15))
+        header_frame.pack(fill="x", padx=20, pady=(20, 12))
         header_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
 
         title_lbl = tk.Label(
             header_frame,
-            text="REAL-TIME & WEB PROTECTION",
+            text="PROTECTION SHIELDS & DEFENSE",
             bg=THEME["bg_panel"],
             fg=THEME["text_primary"],
             font=(THEME["font_family"], 14, "bold"),
@@ -36,7 +40,7 @@ class ProtectionView(tk.Frame):
 
         desc_lbl = tk.Label(
             header_frame,
-            text="Continuous background filesystem monitoring and web destination reputation filtering.",
+            text="Multi-layered defensive sentinels actively protecting files, web browsing, network traffic, and running processes.",
             bg=THEME["bg_panel"],
             fg=THEME["text_secondary"],
             font=(THEME["font_family"], 10),
@@ -44,12 +48,34 @@ class ProtectionView(tk.Frame):
         )
         desc_lbl.pack(fill="x", pady=(2, 0))
 
-        content_frame = tk.Frame(self, bg=THEME["bg_darkest"])
-        content_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        # Notebook for Protection Subsystems
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill="both", expand=True, padx=20, pady=(0, 20))
 
-        # 1. Left Panel - Real-Time Sentinel & Folders
+        # 1. Tab 1: Real-Time & Web Shield
+        self.tab_realtime = tk.Frame(self.notebook, bg=THEME["bg_darkest"], padx=10, pady=10)
+        self.notebook.add(self.tab_realtime, text="  🛡️ Real-Time & Web  ")
+        self._build_realtime_tab(self.tab_realtime)
+
+        # 2. Tab 2: Firewall & Network Shield
+        self.firewall_view = FirewallView(self.notebook, engine=self.engine)
+        self.notebook.add(self.firewall_view, text="  🔥 Firewall & Network  ")
+
+        # 3. Tab 3: EDR & Exploit Shield
+        self.edr_view = EDRView(self.notebook, engine=self.engine)
+        self.notebook.add(self.edr_view, text="  🧠 Advanced Defense (EDR)  ")
+
+        # 4. Tab 4: Security Reports
+        self.reports_view = ReportsView(self.notebook, engine=self.engine)
+        self.notebook.add(self.reports_view, text="  📊 Security Reports  ")
+
+    def _build_realtime_tab(self, parent: tk.Frame) -> None:
+        content_frame = tk.Frame(parent, bg=THEME["bg_darkest"])
+        content_frame.pack(fill="both", expand=True)
+
+        # Left Column - Real-Time Sentinel & Folders
         left_col = tk.Frame(content_frame, bg=THEME["bg_panel"], padx=16, pady=16)
-        left_col.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        left_col.pack(side="left", fill="both", expand=True, padx=(0, 8))
         left_col.configure(highlightbackground=THEME["border"], highlightthickness=1)
 
         rt_hdr = tk.Label(
@@ -62,15 +88,25 @@ class ProtectionView(tk.Frame):
         )
         rt_hdr.pack(fill="x")
 
+        rt_explain = tk.Label(
+            left_col,
+            text="Automatically scans files as they are opened, downloaded, or copied to your system.",
+            bg=THEME["bg_panel"],
+            fg=THEME["text_secondary"],
+            font=(THEME["font_family"], 9),
+            anchor="w",
+        )
+        rt_explain.pack(fill="x", pady=(2, 6))
+
         self.rt_status_lbl = tk.Label(
             left_col,
-            text="Status: ACTIVE (Monitoring Downloads, Desktop, Temp)",
+            text="Status: ACTIVE (Filesystem Sentinel Guarding)",
             bg=THEME["bg_panel"],
             fg=THEME["status_safe"],
             font=(THEME["font_family"], 9, "bold"),
             anchor="w",
         )
-        self.rt_status_lbl.pack(fill="x", pady=(4, 12))
+        self.rt_status_lbl.pack(fill="x", pady=(2, 10))
 
         # Toggle Button
         self.btn_toggle_rt = ttk.Button(
@@ -79,17 +115,17 @@ class ProtectionView(tk.Frame):
             style="Secondary.TButton",
             command=self._on_toggle_realtime,
         )
-        self.btn_toggle_rt.pack(anchor="w", pady=(0, 15))
+        self.btn_toggle_rt.pack(anchor="w", pady=(0, 12))
 
         folders_lbl = tk.Label(
             left_col,
-            text="MONITORED DIRECTORIES",
+            text="MONITORED FOLDERS",
             bg=THEME["bg_panel"],
             fg=THEME["text_secondary"],
             font=(THEME["font_family"], 9, "bold"),
             anchor="w",
         )
-        folders_lbl.pack(fill="x", pady=(0, 6))
+        folders_lbl.pack(fill="x", pady=(0, 4))
 
         # Listbox for Monitored Folders
         self.folders_listbox = tk.Listbox(
@@ -98,7 +134,7 @@ class ProtectionView(tk.Frame):
             fg=THEME["text_primary"],
             selectbackground=THEME["border_highlight"],
             font=(THEME["font_mono"], 9),
-            height=6,
+            height=5,
             borderwidth=0,
             highlightthickness=1,
             highlightbackground=THEME["border"],
@@ -106,17 +142,17 @@ class ProtectionView(tk.Frame):
         self.folders_listbox.pack(fill="both", expand=True)
 
         folder_btns = tk.Frame(left_col, bg=THEME["bg_panel"])
-        folder_btns.pack(fill="x", pady=(8, 0))
+        folder_btns.pack(fill="x", pady=(6, 10))
 
         btn_add = ttk.Button(folder_btns, text="Add Folder...", style="Primary.TButton", command=self._on_add_folder)
-        btn_add.pack(side="left", padx=(0, 8))
+        btn_add.pack(side="left", padx=(0, 6))
 
         btn_remove = ttk.Button(folder_btns, text="Remove", style="Secondary.TButton", command=self._on_remove_folder)
         btn_remove.pack(side="left")
 
         # Active Defense Sentinels Telemetry Box
-        sentinels_frame = tk.Frame(left_col, bg=THEME["bg_input"], padx=12, pady=10)
-        sentinels_frame.pack(fill="x", pady=(14, 0))
+        sentinels_frame = tk.Frame(left_col, bg=THEME["bg_input"], padx=10, pady=8)
+        sentinels_frame.pack(fill="x")
         sentinels_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
 
         st_title = tk.Label(
@@ -127,7 +163,7 @@ class ProtectionView(tk.Frame):
             font=(THEME["font_family"], 9, "bold"),
             anchor="w",
         )
-        st_title.pack(fill="x", pady=(0, 4))
+        st_title.pack(fill="x", pady=(0, 3))
 
         self.sentinel_rows = {}
         for s_key, s_name in [
@@ -147,9 +183,9 @@ class ProtectionView(tk.Frame):
             s_row.pack(fill="x", pady=1)
             self.sentinel_rows[s_key] = s_row
 
-        # 2. Right Panel - Web Protection Tester
+        # Right Column - Web Protection Tester
         right_col = tk.Frame(content_frame, bg=THEME["bg_panel"], padx=16, pady=16)
-        right_col.pack(side="right", fill="both", expand=True, padx=(10, 0))
+        right_col.pack(side="right", fill="both", expand=True, padx=(8, 0))
         right_col.configure(highlightbackground=THEME["border"], highlightthickness=1)
 
         web_hdr = tk.Label(
@@ -169,10 +205,10 @@ class ProtectionView(tk.Frame):
             fg=THEME["text_secondary"],
             font=(THEME["font_family"], 9),
             anchor="w",
-            wraplength=320,
+            wraplength=340,
             justify="left",
         )
-        web_desc.pack(fill="x", pady=(4, 14))
+        web_desc.pack(fill="x", pady=(2, 10))
 
         url_lbl = tk.Label(
             right_col,
@@ -195,10 +231,10 @@ class ProtectionView(tk.Frame):
             relief="flat",
         )
         self.url_entry.insert(0, "https://phishing-bank-update.test/login")
-        self.url_entry.pack(fill="x", ipady=6, pady=(0, 10))
+        self.url_entry.pack(fill="x", ipady=6, pady=(0, 8))
 
         btn_check = ttk.Button(right_col, text="Check Web Reputation", style="Primary.TButton", command=self._on_check_url)
-        btn_check.pack(anchor="w", pady=(0, 15))
+        btn_check.pack(anchor="w", pady=(0, 12))
 
         # Result Card Box
         self.web_result_frame = tk.Frame(right_col, bg=THEME["bg_input"], padx=12, pady=12)
@@ -222,7 +258,7 @@ class ProtectionView(tk.Frame):
             fg=THEME["text_muted"],
             font=(THEME["font_family"], 9),
             anchor="w",
-            wraplength=300,
+            wraplength=320,
             justify="left",
         )
         self.web_result_details.pack(fill="x", pady=(4, 0))
@@ -239,7 +275,7 @@ class ProtectionView(tk.Frame):
         is_guard_active = self.engine.realtime_guard.is_running
         if is_guard_active:
             self.rt_status_lbl.config(text="Status: ACTIVE (Filesystem Sentinel Guarding)", fg=THEME["status_safe"])
-            self.btn_toggle_rt.config(text="Stop Guard")
+            self.btn_toggle_rt.config(text="Pause Guard")
         else:
             self.rt_status_lbl.config(text="Status: INACTIVE (Guard Paused)", fg=THEME["status_warning"])
             self.btn_toggle_rt.config(text="Start Guard")
@@ -265,6 +301,11 @@ class ProtectionView(tk.Frame):
                 text="● Authenticode WinTrust Verifier: ACTIVE (Kernel32/WinTrust)",
                 fg=THEME["status_safe"],
             )
+
+        if hasattr(self, "firewall_view") and hasattr(self.firewall_view, "refresh_data"):
+            self.firewall_view.refresh_data()
+        if hasattr(self, "edr_view") and hasattr(self.edr_view, "refresh_data"):
+            self.edr_view.refresh_data()
 
     def _on_toggle_realtime(self) -> None:
         if self.engine.realtime_guard.is_running:

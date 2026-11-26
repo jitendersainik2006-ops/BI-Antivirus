@@ -133,6 +133,40 @@ def apply_theme(root: tk.Tk) -> ttk.Style:
         thickness=12,
     )
 
+    # Notebook & Tabs
+    style.configure(
+        "TNotebook",
+        background=THEME["bg_darkest"],
+        borderwidth=0,
+    )
+    style.configure(
+        "TNotebook.Tab",
+        background=THEME["bg_dark"],
+        foreground=THEME["text_secondary"],
+        font=(THEME["font_family"], 9, "bold"),
+        padding=(16, 8),
+        borderwidth=0,
+    )
+    style.map(
+        "TNotebook.Tab",
+        background=[("selected", THEME["bg_panel"]), ("active", THEME["bg_panel_hover"])],
+        foreground=[("selected", THEME["accent_primary"]), ("active", THEME["text_primary"])],
+    )
+
+    # Success Button (Green for Safe Actions)
+    style.configure(
+        "Success.TButton",
+        background=THEME["status_safe"],
+        foreground="#000000",
+        font=(THEME["font_family"], 10, "bold"),
+        padding=(16, 8),
+        borderwidth=0,
+    )
+    style.map(
+        "Success.TButton",
+        background=[("active", "#1fe39b"), ("pressed", THEME["status_safe"])],
+    )
+
     # Treeview (Data Tables)
     style.configure(
         "Treeview",
@@ -146,12 +180,12 @@ def apply_theme(root: tk.Tk) -> ttk.Style:
     style.map(
         "Treeview",
         background=[("selected", THEME["border_highlight"])],
-        foreground=[("selected", THEME["text_primary"])],
+        foreground=[("selected", "#0a0a0c")],
     )
     style.configure(
         "Treeview.Heading",
         background=THEME["bg_panel"],
-        foreground=THEME["text_secondary"],
+        foreground=THEME["accent_primary"],
         font=(THEME["font_family"], 9, "bold"),
         padding=(8, 6),
         borderwidth=0,

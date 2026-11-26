@@ -1,0 +1,38 @@
+====================================================================================================
+BI ANTIVIRUS ENTERPRISE — MASTER MULTI-PLATFORM RELEASE ARTIFACT CHECKSUM MANIFEST
+Generated: 2026-11-26
+Organization: Black Intel Cyber Defense Platform
+====================================================================================================
+SHA-256 HASH                                                         SIZE (BYTES)   FILE PATH
+------------------------------------------------------------------------------------------------------------------------
+7e5cf1170a27d6eadb5e6ea053c3dac546d81e1e6b49553f2f6a9e5834fe55b8          8631   Android\BI_Antivirus_Android_BUILD_VERIFICATION.md
+d1a30e354c084f1fab05c323841ef64d0e141cd88b91a7ee8e8921d383d9321d         56866   Android\BI_Antivirus_Android_v1.0.0_Source.zip
+5257ce5a53ec10e5f91be7c434a0fd4e941358ed2fc0a6474f14ac006824df83       1186749   Android\BI_Antivirus_Enterprise_v1.0.0.apk
+f981aca29afed2418d849c21199fdba3eb7c2b8130165eab0a66a8e0e515b062      16255000   Android\BI_Antivirus_Enterprise_v1.0.0_Debug.apk
+503aa316cc515c00db4f3623d5643aaa085cb9070a8617c4891129e6d05bf74e          1649   Android\BUILD_INSTRUCTIONS.md
+07c47beb393dbe8feb9e8658bdcce8c74b99c23ec75ba139bef446dfb0c57230           280   Android\signing-config-template.properties
+a64e694020a7b39cc87c8321a727c57b44dc28b3d104357f423ddb2c0842dbe2          3363   Documentation\ANDROID_INSTALLATION_GUIDE.md
+5f95c0d744ed08d45e3177c57161513f4eae2820aa9d4020a6798fac162fefd2          8913   Documentation\ANDROID_SETUP.md
+a3c95539f0661ad05abdbfeef325a07784cd1d59a97c55eb22d5f02082618a26         10264   Documentation\CROSS_PLATFORM_ARCHITECTURE.md
+46e0052336233ee2379c706635297a40e1a22e74f569f434345c0984cc69fe6a          5857   Documentation\CROSS_PLATFORM_FEATURE_MATRIX.md
+c7573cab8434a4b41167ed0d27e028f4b3aa375f557dbc705040c67bc7750acf          3551   Documentation\IOS_INSTALLATION_GUIDE.md
+7743d20542c61eeda923c7697114230bec733cd99cf9e9876ddb46e777c26c33          8056   Documentation\IOS_SETUP.md
+d04349d5a01869b3482a9808e6db2d16461129d2b721ab665e665556e0a0a0dd          4431   Documentation\RELEASE_NOTES.md
+7d61269edd487ee7bb66e9ce9d5b43e12541072534242a919206e23f173fdcec          6291   Documentation\UNIVERSAL_USER_MANUAL.md
+a378f51cd7c34f13a78f322b6f7cae73b94b76085ac763faaedd0890ba1f7078          2989   Documentation\WINDOWS_INSTALLATION_GUIDE.md
+568c3f2e49afe0474b5ad7a37b8c223c14a5a4762ac47c8447dcf3e18793f77e         11821   FINAL_PRACTICAL_QA_REPORT.md
+c9aea59e1148afcb5c14e870a9d38907c76b8990ea9b4f474b2e4dfea9c3128c         12688   INSTALLATION_VERIFICATION_REPORT.md
+f4f174b3e0e49e578a55a6d69c6d54d5134fba3d0a5826d82a8470e1fb62fc50         45722   iOS\BI_Antivirus_iOS_v1.0.0_Source.zip
+2826d8b30de240327e9a7879a2f9e259917d90aecc957e7a7f29f648b936ea6d          1818   iOS\BUILD_INSTRUCTIONS.md
+73d748d2f8183ce232da96676535a777657fe7a476d0934c3a73400c6e02b0f4           500   iOS\ExportOptions.plist
+ca1fbff5997ab06043deaf75a3daad0e46e4b934f2666e8306d77611e95463d5          1121   TestReports\cross_platform_8_stages_passed.txt
+51a90f7b99b3014c60a196596f87fc628020b6e0264ebb2b016aeb5f26fc9a6e          1040   TestReports\gui_workflows_8_steps_passed.txt
+23b1c77cba8f30c537115504d2b3ed6c85003ac26071735161ac6aa9d8bb97e3           971   TestReports\windows_regression_285_passed.txt
+8ff2db14df0ad46d40130cfde6d866ca72fe97722f757fbe5059d52bbcab4b28        852336   Windows\BI_Antivirus_Enterprise_v1.0.0_Portable.zip
+2952591f7fe7f15e6e8ad97b38553d6f0250b443411ecacbd2916f6c3c760be7          1210   Windows\DELIVERY_SHA256.txt
+7b6d015371dffa5dd79174c28ae4f9e9d3b34b70d3c951a26cb9bd00c1e79d1c       3336583   Windows\Installer\BI_Antivirus_Enterprise_v1.0.0_Setup.exe
+3925864dc8d78ef32ff120d47aff0762c21ba2b9bfa2efac8b48ca075105c3fa           107   Windows\Installer\INSTALLER_SHA256.txt
+9aa771403f45eaef4f47951160943344a635819b90f6ac154c0ab912ab6ab75d          3363   Windows\Installer\WINDOWS_INSTALLER_GUIDE.md
+61496d94d32830ccbd573451813eb2c0d15808e8074126c0245916725271abfd           696   Windows\package_manifest.json
+1338b8f91be0e4f02374f6e4f38e261576dbbf833d6200c1811491da46e8bb78          8556   Windows\SIR_README_FIRST.md
+========================================================================================================================

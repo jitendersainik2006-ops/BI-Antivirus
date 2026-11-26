@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QuarantineLedger",
+  "description": "Standard cross-platform schema for mobile quarantine ledger entries",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "originalFileName",
+      "originalPath",
+      "quarantinedTimestamp",
+      "sha256",
+      "threatName",
+      "vaultFilePath",
+      "fileSize",
+      "status"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^Q-[A-F0-9]{8}$"
+      },
+      "originalFileName": {
+        "type": "string",
+        "minLength": 1
+      },
+      "originalPath": {
+        "type": "string"
+      },
+      "quarantinedTimestamp": {
+        "type": "number",
+        "minimum": 0
+      },
+      "sha256": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "threatName": {
+        "type": "string"
+      },
+      "vaultFilePath": {
+        "type": "string"
+      },
+      "fileSize": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "status": {
+        "type": "string",
+        "enum": ["QUARANTINED", "RESTORED", "DELETED"]
+      },
+      "restoredTimestamp": {
+        "type": ["number", "null"]
+      }
+    },
+    "additionalProperties": false
+  }
+}

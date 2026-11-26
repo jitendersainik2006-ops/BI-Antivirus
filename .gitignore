@@ -91,3 +91,32 @@ reports/BI_ANTIVIRUS_N8N_VOICE_INTEGRATION_REPORT.md
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# 12. Keystores, Cryptographic Secrets & Secure Vault
+*.jks
+*.keystore
+*.p12
+*.pfx
+secure_credentials_vault/
+signing.properties
+local.properties
+
+# 13. Mobile & Cross-Platform Build Outputs & Caches
+.gradle/
+**/.gradle/
+**/build/
+android/.gradle/
+android/**/build/
+ios/**/build/
+ios/**/DerivedData/
+*.apk
+*.aab
+
+# 14. Binary Release Distribution Packages (Published via GitHub Releases)
+releases/**/*.exe
+releases/**/*.apk
+releases/**/*.zip
+releases/Windows/Installer/*.exe
+releases/Android/*.apk
+!bi_antivirus/tests/fixtures/*.exe
+

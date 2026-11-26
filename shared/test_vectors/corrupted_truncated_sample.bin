@@ -1,0 +1,2 @@
+Corrupted and truncated binary header test input without valid magic or EOF termination.
+[TRUNCATED_STREAM_AT_OFFSET_0x4F]

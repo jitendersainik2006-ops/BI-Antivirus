@@ -1,0 +1,3 @@
+BI Antivirus Enterprise - Clean Benign Test Document
+This is a safe, plain-text demonstration document used to verify that clean files are not falsely flagged.
+All integrity checks, hash calculations, and entropy evaluations should classify this file as CLEAN.

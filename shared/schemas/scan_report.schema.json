@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScanReportExport",
+  "description": "Standard schema for exported mobile scan audit reports",
+  "type": "object",
+  "required": [
+    "reportVersion",
+    "generatedAt",
+    "deviceInfo",
+    "scanDurationMs",
+    "totalFilesScanned",
+    "threatsDetectedCount",
+    "suspiciousCount",
+    "cleanCount",
+    "unsupportedCount",
+    "scanErrorCount",
+    "results"
+  ],
+  "properties": {
+    "reportVersion": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deviceInfo": {
+      "type": "string"
+    },
+    "scanDurationMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "totalFilesScanned": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "threatsDetectedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "suspiciousCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cleanCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unsupportedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scanErrorCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "fileName",
+          "filePath",
+          "fileSize",
+          "sha256",
+          "entropy",
+          "verdict",
+          "severity"
+        ],
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "filePath": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "md5": {
+            "type": "string"
+          },
+          "entropy": {
+            "type": "number"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": ["CLEAN", "THREAT_DETECTED", "SUSPICIOUS", "UNSUPPORTED", "SCAN_ERROR"]
+          },
+          "threatName": {
+            "type": ["string", "null"]
+          },
+          "threatFamily": {
+            "type": ["string", "null"]
+          },
+          "severity": {
+            "type": "string"
+          },
+          "matchedRules": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "errorMessage": {
+            "type": ["string", "null"]
+          }
+        }
+      }
+    }
+  }
+}

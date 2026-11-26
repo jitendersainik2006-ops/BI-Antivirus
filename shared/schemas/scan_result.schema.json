@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BIAntivirusScanResult",
+  "type": "object",
+  "required": [
+    "scan_id",
+    "timestamp",
+    "platform",
+    "file_name",
+    "file_size",
+    "sha256",
+    "verdict"
+  ],
+  "properties": {
+    "scan_id": {
+      "type": "string",
+      "description": "Unique identifier for this scan event"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["windows", "android", "ios"]
+    },
+    "file_name": {
+      "type": "string"
+    },
+    "file_size": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{0,64}$"
+    },
+    "md5": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{0,32}$"
+    },
+    "entropy": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 8.0
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["CLEAN", "THREAT_DETECTED", "SUSPICIOUS", "UNSUPPORTED", "SCAN_ERROR"]
+    },
+    "threat_name": {
+      "type": ["string", "null"]
+    },
+    "threat_family": {
+      "type": ["string", "null"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    },
+    "matched_rules": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "is_quarantined": {
+      "type": "boolean"
+    },
+    "error_message": {
+      "type": ["string", "null"]
+    }
+  }
+}

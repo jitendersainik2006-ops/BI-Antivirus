@@ -1,0 +1,15 @@
+<resources>
+    <!-- Black Intel Official Black & Gold Design System Palette -->
+    <color name="bg_darkest">#0A0A0C</color>
+    <color name="bg_card">#181A22</color>
+    <color name="bg_card_hover">#222530</color>
+    <color name="border_subtle">#272A36</color>
+    <color name="gold_accent">#D4AF37</color>
+    <color name="gold_bright">#F3CF65</color>
+    <color name="status_safe">#10B981</color>
+    <color name="status_warning">#F59E0B</color>
+    <color name="status_threat">#EF4444</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#9CA3AF</color>
+    <color name="text_muted">#6B7280</color>
+</resources>

@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BlackIntelSecurityPolicy",
+  "description": "Standard cross-platform enterprise security policy specification for BI Antivirus endpoints",
+  "type": "object",
+  "required": [
+    "policy_id",
+    "version",
+    "timestamp",
+    "realtime_protection",
+    "heuristic_analysis",
+    "quarantine_controls",
+    "signature"
+  ],
+  "properties": {
+    "policy_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "realtime_protection": {
+      "type": "object",
+      "required": ["enabled", "scan_archives", "max_archive_depth"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "scan_archives": { "type": "boolean" },
+        "max_archive_depth": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "heuristic_analysis": {
+      "type": "object",
+      "required": ["enabled", "entropy_threshold", "block_double_extensions"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "entropy_threshold": { "type": "number", "minimum": 0.0, "maximum": 8.0 },
+        "block_double_extensions": { "type": "boolean" }
+      }
+    },
+    "quarantine_controls": {
+      "type": "object",
+      "required": ["vault_format", "retention_days", "auto_quarantine"],
+      "properties": {
+        "vault_format": { "type": "string", "enum": ["BIQ2_AES_CBC", "BI_AES_GCM_V1", "CRYPTOKIT_AES_GCM"] },
+        "retention_days": { "type": "integer", "minimum": 1 },
+        "auto_quarantine": { "type": "boolean" }
+      }
+    },
+    "signature": {
+      "type": "string"
+    }
+  }
+}

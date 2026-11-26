@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BlackIntelUpdateManifest",
+  "description": "Standard signed update manifest schema for definitions and rule distribution",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "sequence",
+    "release_date",
+    "engine_version_minimum",
+    "signatures_count",
+    "payload_sha256",
+    "hmac_signature"
+  ],
+  "properties": {
+    "manifest_version": {
+      "type": "string"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "release_date": {
+      "type": "string"
+    },
+    "engine_version_minimum": {
+      "type": "string"
+    },
+    "signatures_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "hmac_signature": {
+      "type": "string"
+    }
+  }
+}

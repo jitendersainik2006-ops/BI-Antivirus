@@ -75,33 +75,41 @@ FAMILY_DROPPER = "Dropper"
 FAMILY_TEST_VIRUS = "TestVirus"
 FAMILY_HEURISTIC = "SuspiciousHeuristic"
 
-# UI Theme - Bitdefender-inspired Modern Cyber Dark Palette
+# UI Theme - Black Intel Official Black & Gold Visual Identity
 THEME = {
-    "bg_darkest": "#090d12",       # Background deep space
-    "bg_dark": "#0f1621",          # Sidebar & card deep navy/charcoal
-    "bg_panel": "#141e2e",         # Card background
-    "bg_panel_hover": "#1c2a3f",   # Interactive hover
-    "bg_input": "#0c131d",         # Form fields & tables
-    "border": "#21324a",           # Borders and dividers
-    "border_highlight": "#355075", # Highlight borders
+    # Deep Black & Charcoal/Graphite Backgrounds
+    "bg_darkest": "#0a0a0c",       # Primary background: Deep Black
+    "bg_dark": "#121318",          # Secondary background: Charcoal / Dark Graphite
+    "bg_panel": "#181a22",         # Card background: Charcoal Graphite
+    "bg_card": "#181a22",          # Reusable Card alias
+    "bg_panel_hover": "#222530",   # Card hover state
+    "bg_input": "#0f1015",         # Form fields & tables background
     
-    # Accent & Status
-    "accent_primary": "#00d285",   # Clean Emerald - Bitdefender-style safe green
-    "accent_secondary": "#00b4d8", # Secondary Cyber Cyan
-    "accent_cyan": "#00b4d8",      # Cyber cyan
-    "accent_hover": "#00f59b",     # Glowing emerald
+    # Borders & Dividers
+    "border": "#272a36",           # Subtle structural border
+    "border_highlight": "#d4af37", # Gold highlight border
+    "border_gold": "#c5a059",      # Subtle gold border for cards
     
-    # Severity Colors
-    "status_safe": "#00d285",      # Emerald Green
-    "status_warning": "#ffb020",   # Warm Amber
-    "status_threat": "#ff385c",    # Threat Crimson
-    "status_critical": "#ff385c",  # Critical Alert Crimson
-    "status_info": "#00b4d8",      # Info Cyan
+    # Accents - Black Intel Official Gold Palette
+    "accent_primary": "#d4af37",   # Primary accent: Premium Metallic Gold
+    "accent_secondary": "#aa8c2c", # Secondary accent: Muted Antique Gold
+    "accent_hover": "#f3cf65",     # Glowing radiant gold for active/hover states
+    "accent_gold": "#d4af37",      # Reusable Gold alias
+    "accent_gold_muted": "#8c701e",# Deep muted gold
+    "accent_cyan": "#38bdf8",      # Subtle sky blue for diagnostic telemetry
+    
+    # Accessible Status Colors
+    "status_safe": "#10b981",      # Accessible Emerald Green (Safe / Clean)
+    "status_warning": "#f59e0b",   # Warm Amber (Warning / Attention)
+    "status_threat": "#ef4444",    # Threat Crimson (Threat / Critical)
+    "status_critical": "#ef4444",  # Critical Alert Crimson
+    "status_info": "#d4af37",      # Info Gold / Status Info
     
     # Typography
-    "text_primary": "#f0f4f8",     # Bright foreground
-    "text_secondary": "#94a3b8",   # Subtle muted silver
-    "text_muted": "#5c6b82",       # Dim captions
+    "text_primary": "#ffffff",     # Primary text: Pure White
+    "text_secondary": "#9ca3af",   # Secondary text: Soft Grey
+    "text_muted": "#6b7280",       # Muted text: Deep Slate Grey
+    "text_gold": "#d4af37",        # Gold highlight text
     
     # Fonts
     "font_family": "Segoe UI",

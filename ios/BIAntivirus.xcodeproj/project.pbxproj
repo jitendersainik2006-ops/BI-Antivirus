@@ -1,0 +1,533 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		10010001 /* BIAntivirusApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010001 /* BIAntivirusApp.swift */; };
+		10010002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010002 /* ContentView.swift */; };
+		10010003 /* CyberDarkGoldTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010003 /* CyberDarkGoldTheme.swift */; };
+		10010004 /* InspectionVerdict.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010004 /* InspectionVerdict.swift */; };
+		10010005 /* ThreatRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010005 /* ThreatRecord.swift */; };
+		10010006 /* FileInspectionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010006 /* FileInspectionResult.swift */; };
+		10010007 /* iOSSecurityPosture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010007 /* iOSSecurityPosture.swift */; };
+		10010008 /* VaultedThreat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010008 /* VaultedThreat.swift */; };
+		10010009 /* HashCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010009 /* HashCalculator.swift */; };
+		10010010 /* EntropyAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010010 /* EntropyAnalyzer.swift */; };
+		10010011 /* ThreatCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010011 /* ThreatCatalog.swift */; };
+		10010012 /* HeuristicScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010012 /* HeuristicScanner.swift */; };
+		10010013 /* IsolatedVaultManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010013 /* IsolatedVaultManager.swift */; };
+		10010014 /* FileInspectionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010014 /* FileInspectionEngine.swift */; };
+		10010015 /* iOSDevicePostureChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010015 /* iOSDevicePostureChecker.swift */; };
+		10010016 /* InspectionHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010016 /* InspectionHistoryStore.swift */; };
+		10010017 /* SecurityPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010017 /* SecurityPreferences.swift */; };
+		10010018 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010018 /* DashboardView.swift */; };
+		10010019 /* PostureAuditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010019 /* PostureAuditView.swift */; };
+		10010020 /* VaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010020 /* VaultView.swift */; };
+		10010021 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010021 /* HistoryView.swift */; };
+		10010022 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010022 /* SettingsView.swift */; };
+		10010023 /* mobile_threat_signatures.json in Resources */ = {isa = PBXBuildFile; fileRef = 20010023 /* mobile_threat_signatures.json */; };
+		10010024 /* HashCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010024 /* HashCalculatorTests.swift */; };
+		10010025 /* EntropyAnalyzerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010025 /* EntropyAnalyzerTests.swift */; };
+		10010026 /* ThreatCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010026 /* ThreatCatalogTests.swift */; };
+		10010027 /* HeuristicScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010027 /* HeuristicScannerTests.swift */; };
+		10010028 /* FileInspectionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010028 /* FileInspectionEngineTests.swift */; };
+		10010031 /* FileTypeInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010031 /* FileTypeInspector.swift */; };
+		10010032 /* ScanReportExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010032 /* ScanReportExporter.swift */; };
+		10010033 /* PrivacySettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010033 /* PrivacySettingsManager.swift */; };
+		10010034 /* FileTypeInspectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010034 /* FileTypeInspectorTests.swift */; };
+		10010035 /* IsolatedVaultManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010035 /* IsolatedVaultManagerTests.swift */; };
+		10010036 /* ScanReportExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20010036 /* ScanReportExporterTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		20010000 /* BIAntivirus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BIAntivirus.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		20010001 /* BIAntivirusApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BIAntivirusApp.swift; sourceTree = "<group>"; };
+		20010002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		20010003 /* CyberDarkGoldTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CyberDarkGoldTheme.swift; sourceTree = "<group>"; };
+		20010004 /* InspectionVerdict.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectionVerdict.swift; sourceTree = "<group>"; };
+		20010005 /* ThreatRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreatRecord.swift; sourceTree = "<group>"; };
+		20010006 /* FileInspectionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInspectionResult.swift; sourceTree = "<group>"; };
+		20010007 /* iOSSecurityPosture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSSecurityPosture.swift; sourceTree = "<group>"; };
+		20010008 /* VaultedThreat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultedThreat.swift; sourceTree = "<group>"; };
+		20010009 /* HashCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashCalculator.swift; sourceTree = "<group>"; };
+		20010010 /* EntropyAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntropyAnalyzer.swift; sourceTree = "<group>"; };
+		20010011 /* ThreatCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreatCatalog.swift; sourceTree = "<group>"; };
+		20010012 /* HeuristicScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicScanner.swift; sourceTree = "<group>"; };
+		20010013 /* IsolatedVaultManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatedVaultManager.swift; sourceTree = "<group>"; };
+		20010014 /* FileInspectionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInspectionEngine.swift; sourceTree = "<group>"; };
+		20010015 /* iOSDevicePostureChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSDevicePostureChecker.swift; sourceTree = "<group>"; };
+		20010016 /* InspectionHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectionHistoryStore.swift; sourceTree = "<group>"; };
+		20010017 /* SecurityPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityPreferences.swift; sourceTree = "<group>"; };
+		20010018 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		20010019 /* PostureAuditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostureAuditView.swift; sourceTree = "<group>"; };
+		20010020 /* VaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultView.swift; sourceTree = "<group>"; };
+		20010021 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		20010022 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		20010023 /* mobile_threat_signatures.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = mobile_threat_signatures.json; sourceTree = "<group>"; };
+		20010024 /* HashCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashCalculatorTests.swift; sourceTree = "<group>"; };
+		20010025 /* EntropyAnalyzerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntropyAnalyzerTests.swift; sourceTree = "<group>"; };
+		20010026 /* ThreatCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThreatCatalogTests.swift; sourceTree = "<group>"; };
+		20010027 /* HeuristicScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeuristicScannerTests.swift; sourceTree = "<group>"; };
+		20010028 /* FileInspectionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInspectionEngineTests.swift; sourceTree = "<group>"; };
+		20010029 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		20010030 /* BIAntivirusTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BIAntivirusTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		20010031 /* FileTypeInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTypeInspector.swift; sourceTree = "<group>"; };
+		20010032 /* ScanReportExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanReportExporter.swift; sourceTree = "<group>"; };
+		20010033 /* PrivacySettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManager.swift; sourceTree = "<group>"; };
+		20010034 /* FileTypeInspectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileTypeInspectorTests.swift; sourceTree = "<group>"; };
+		20010035 /* IsolatedVaultManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IsolatedVaultManagerTests.swift; sourceTree = "<group>"; };
+		20010036 /* ScanReportExporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanReportExporterTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		30010001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30010002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		40010001 = {
+			isa = PBXGroup;
+			children = (
+				40010002 /* BIAntivirus */,
+				40010009 /* BIAntivirusTests */,
+				40010010 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		40010002 /* BIAntivirus */ = {
+			isa = PBXGroup;
+			children = (
+				40010003 /* App */,
+				40010004 /* Theme */,
+				40010005 /* Models */,
+				40010006 /* Core */,
+				40010007 /* Posture */,
+				40010008 /* Storage */,
+				40010011 /* Views */,
+				40010012 /* Resources */,
+			);
+			path = BIAntivirus;
+			sourceTree = "<group>";
+		};
+		40010003 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				20010001 /* BIAntivirusApp.swift */,
+				20010002 /* ContentView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		40010004 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				20010003 /* CyberDarkGoldTheme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		40010005 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				20010004 /* InspectionVerdict.swift */,
+				20010005 /* ThreatRecord.swift */,
+				20010006 /* FileInspectionResult.swift */,
+				20010007 /* iOSSecurityPosture.swift */,
+				20010008 /* VaultedThreat.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		40010006 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				20010009 /* HashCalculator.swift */,
+				20010010 /* EntropyAnalyzer.swift */,
+				20010011 /* ThreatCatalog.swift */,
+				20010012 /* HeuristicScanner.swift */,
+				20010013 /* IsolatedVaultManager.swift */,
+				20010014 /* FileInspectionEngine.swift */,
+				20010031 /* FileTypeInspector.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		40010007 /* Posture */ = {
+			isa = PBXGroup;
+			children = (
+				20010015 /* iOSDevicePostureChecker.swift */,
+			);
+			path = Posture;
+			sourceTree = "<group>";
+		};
+		40010008 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+				20010016 /* InspectionHistoryStore.swift */,
+				20010017 /* SecurityPreferences.swift */,
+				20010032 /* ScanReportExporter.swift */,
+				20010033 /* PrivacySettingsManager.swift */,
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		40010009 /* BIAntivirusTests */ = {
+			isa = PBXGroup;
+			children = (
+				20010024 /* HashCalculatorTests.swift */,
+				20010025 /* EntropyAnalyzerTests.swift */,
+				20010026 /* ThreatCatalogTests.swift */,
+				20010027 /* HeuristicScannerTests.swift */,
+				20010028 /* FileInspectionEngineTests.swift */,
+				20010034 /* FileTypeInspectorTests.swift */,
+				20010035 /* IsolatedVaultManagerTests.swift */,
+				20010036 /* ScanReportExporterTests.swift */,
+			);
+			path = BIAntivirusTests;
+			sourceTree = "<group>";
+		};
+		40010010 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				20010000 /* BIAntivirus.app */,
+				20010030 /* BIAntivirusTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		40010011 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				20010018 /* DashboardView.swift */,
+				20010019 /* PostureAuditView.swift */,
+				20010020 /* VaultView.swift */,
+				20010021 /* HistoryView.swift */,
+				20010022 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		40010012 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				20010029 /* Info.plist */,
+				20010023 /* mobile_threat_signatures.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		50010001 /* BIAntivirus */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 60010001 /* Build configuration list for PBXNativeTarget "BIAntivirus" */;
+			buildPhases = (
+				70010001 /* Sources */,
+				30010001 /* Frameworks */,
+				80010001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BIAntivirus;
+			productName = BIAntivirus;
+			productReference = 20010000 /* BIAntivirus.app */;
+			productType = "com.apple.product-type.application";
+		};
+		50010002 /* BIAntivirusTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 60010002 /* Build configuration list for PBXNativeTarget "BIAntivirusTests" */;
+			buildPhases = (
+				70010002 /* Sources */,
+				30010002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BIAntivirusTests;
+			productName = BIAntivirusTests;
+			productReference = 20010030 /* BIAntivirusTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		00010001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					50010001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					50010002 = {
+						CreatedOnToolsVersion = 15.0;
+						TestTargetID = 50010001;
+					};
+				};
+			};
+			buildConfigurationList = 60010000 /* Build configuration list for PBXProject "BIAntivirus" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 40010001;
+			productRefGroup = 40010010 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				50010001 /* BIAntivirus */,
+				50010002 /* BIAntivirusTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		80010001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10010023 /* mobile_threat_signatures.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		70010001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10010001 /* BIAntivirusApp.swift in Sources */,
+				10010002 /* ContentView.swift in Sources */,
+				10010003 /* CyberDarkGoldTheme.swift in Sources */,
+				10010004 /* InspectionVerdict.swift in Sources */,
+				10010005 /* ThreatRecord.swift in Sources */,
+				10010006 /* FileInspectionResult.swift in Sources */,
+				10010007 /* iOSSecurityPosture.swift in Sources */,
+				10010008 /* VaultedThreat.swift in Sources */,
+				10010009 /* HashCalculator.swift in Sources */,
+				10010010 /* EntropyAnalyzer.swift in Sources */,
+				10010011 /* ThreatCatalog.swift in Sources */,
+				10010012 /* HeuristicScanner.swift in Sources */,
+				10010013 /* IsolatedVaultManager.swift in Sources */,
+				10010014 /* FileInspectionEngine.swift in Sources */,
+				10010015 /* iOSDevicePostureChecker.swift in Sources */,
+				10010016 /* InspectionHistoryStore.swift in Sources */,
+				10010017 /* SecurityPreferences.swift in Sources */,
+				10010018 /* DashboardView.swift in Sources */,
+				10010019 /* PostureAuditView.swift in Sources */,
+				10010020 /* VaultView.swift in Sources */,
+				10010021 /* HistoryView.swift in Sources */,
+				10010022 /* SettingsView.swift in Sources */,
+				10010031 /* FileTypeInspector.swift in Sources */,
+				10010032 /* ScanReportExporter.swift in Sources */,
+				10010033 /* PrivacySettingsManager.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		70010002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				10010024 /* HashCalculatorTests.swift in Sources */,
+				10010025 /* EntropyAnalyzerTests.swift in Sources */,
+				10010026 /* ThreatCatalogTests.swift in Sources */,
+				10010027 /* HeuristicScannerTests.swift in Sources */,
+				10010028 /* FileInspectionEngineTests.swift in Sources */,
+				10010034 /* FileTypeInspectorTests.swift in Sources */,
+				10010035 /* IsolatedVaultManagerTests.swift in Sources */,
+				10010036 /* ScanReportExporterTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		90010001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		90010002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		90010003 /* Debug Target */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BIAntivirus/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.biantivirus.enterprise.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		90010004 /* Release Target */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BIAntivirus/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.biantivirus.enterprise.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		90010005 /* Debug Test Target */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.biantivirus.enterprise.ios.BIAntivirusTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BIAntivirus.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BIAntivirus";
+			};
+			name = Debug;
+		};
+		90010006 /* Release Test Target */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.biantivirus.enterprise.ios.BIAntivirusTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BIAntivirus.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BIAntivirus";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		60010000 /* Build configuration list for PBXProject "BIAntivirus" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90010001 /* Debug */,
+				90010002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		60010001 /* Build configuration list for PBXNativeTarget "BIAntivirus" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90010003 /* Debug Target */,
+				90010004 /* Release Target */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		60010002 /* Build configuration list for PBXNativeTarget "BIAntivirusTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90010005 /* Debug Test Target */,
+				90010006 /* Release Test Target */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = 00010001 /* Project object */;
+}
