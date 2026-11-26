@@ -3,7 +3,7 @@
 ; Black Intel Cyber Defense Platform
 
 #define MyAppName "BI Antivirus Enterprise"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Black Intel Cyber Defense Platform"
 #define MyAppURL "https://github.com/jitendersainik2006-ops/BI-Antivirus"
 #define MyAppExeName "Launch_BIAntivirus.vbs"
@@ -21,8 +21,8 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\Black Intel\BI Antivirus
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-OutputDir={#SourceDir}\releases\Windows\Installer
-OutputBaseFilename=BI_Antivirus_Enterprise_v1.0.0_Setup
+OutputDir={#SourceDir}\build\staging_installer
+OutputBaseFilename=BI_Antivirus_Enterprise_v1.1.0_Setup
 SetupIconFile={#SourceDir}\bi_antivirus\resources\bi_antivirus.ico
 Compression=lzma2/max
 SolidCompression=yes
@@ -36,12 +36,12 @@ DisableFinishedPage=no
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 UninstallDisplayIcon={app}\bi_antivirus.ico
-VersionInfoVersion=1.0.0.0
+VersionInfoVersion=1.1.0.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=BI Antivirus Enterprise Endpoint Protection
 VersionInfoCopyright=Copyright (C) 2026 Black Intel Cyber Defense
 VersionInfoProductName={#MyAppName}
-VersionInfoProductVersion=1.0.0
+VersionInfoProductVersion=1.1.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

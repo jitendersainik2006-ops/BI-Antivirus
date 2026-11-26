@@ -146,7 +146,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = "Zero Cloud Telemetry Leakage • Enterprise v1.0.0",
+                        text = "Zero Cloud Telemetry Leakage • Enterprise v1.1.0",
                         color = TextMuted,
                         fontSize = 11.sp
                     )
