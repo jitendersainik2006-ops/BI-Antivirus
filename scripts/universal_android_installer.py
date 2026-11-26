@@ -12,6 +12,7 @@ import os
 import sys
 import time
 import shutil
+import argparse
 import subprocess
 from pathlib import Path
 
@@ -73,7 +74,22 @@ def diagnose_usb_pnp():
         return lines
     return []
 
+def parse_battery_level(dumpsys_output: str) -> str:
+    """Parse battery level percentage from dumpsys battery output."""
+    for line in dumpsys_output.splitlines():
+        if "level:" in line.lower():
+            parts = line.split(":")
+            if len(parts) > 1:
+                return parts[1].strip() + "%"
+    return "Unknown"
+
 def main():
+    parser = argparse.ArgumentParser(description="BI Antivirus Universal Android Installer")
+    parser.add_argument("--check-only", action="store_true", help="Audit ADB and device presence without installing")
+    parser.add_argument("--non-interactive", action="store_true", help="Run without interactive confirmation prompts")
+    parser.add_argument("--device", type=str, default="", help="Explicit ADB device serial/identifier")
+    args = parser.parse_args()
+
     print_header()
 
     adb = find_adb()
@@ -84,7 +100,8 @@ def main():
         print("    Or download Android SDK Platform-Tools from Google:")
         print("      https://developer.android.com/studio/releases/platform-tools")
         print()
-        input("Press Enter to exit...")
+        if not args.non_interactive and not args.check_only:
+            input("Press Enter to exit...")
         return 1
 
     print(f"[*] Detected ADB Toolchain: {adb}")
@@ -92,7 +109,8 @@ def main():
     if not APK_PATH.exists():
         print(f"[!] Error: Release APK not found at: {APK_PATH}")
         print("    Please compile the release APK first (gradle assembleRelease).")
-        input("Press Enter to exit...")
+        if not args.non_interactive and not args.check_only:
+            input("Press Enter to exit...")
         return 1
 
     apk_size_mb = APK_PATH.stat().st_size / (1024 * 1024)
@@ -133,20 +151,49 @@ def main():
         print("-" * 76)
         print()
         print("ALTERNATIVE INSTALLATION OPTIONS:")
-        print("  • Wireless / Local Network QR Transfer: Run 'run_local_apk_server.bat'")
+        print("  • Wireless / Local Network QR Transfer: Run 'START_QR_INSTALLATION.bat'")
         print("  • Manual Installation: Copy APK directly to phone and tap in File Manager.")
         print("    Full Bilingual Guide: D:\\bit defender\\docs\\UNIVERSAL_ANDROID_INSTALLATION_GUIDE.md")
         print()
-        input("Press Enter to exit...")
+        if args.check_only:
+            return 0
+        if not args.non_interactive:
+            input("Press Enter to exit...")
         return 2
 
-    # Analyze first device state
-    dev_entry = device_lines[0]
-    dev_parts = dev_entry.split()
+    # Select target device
+    selected_device_line = device_lines[0]
+    if args.device:
+        matching = [l for l in device_lines if l.startswith(args.device)]
+        if matching:
+            selected_device_line = matching[0]
+        else:
+            print(f"[!] Warning: Specified device '{args.device}' not found. Available devices:")
+            for l in device_lines:
+                print(f"    • {l}")
+            return 1
+    elif len(device_lines) > 1:
+        print(f"[*] Multiple devices detected ({len(device_lines)}):")
+        for idx, l in enumerate(device_lines):
+            print(f"    [{idx + 1}] {l}")
+        if not args.non_interactive and not args.check_only:
+            choice = input(f"Select device index [1-{len(device_lines)}] (default 1): ").strip()
+            if choice.isdigit() and 1 <= int(choice) <= len(device_lines):
+                selected_device_line = device_lines[int(choice) - 1]
+            else:
+                selected_device_line = device_lines[0]
+        else:
+            selected_device_line = device_lines[0]
+
+    dev_parts = selected_device_line.split()
     dev_id = dev_parts[0]
     dev_status = dev_parts[1] if len(dev_parts) > 1 else "unknown"
 
-    print(f"[*] Detected Device Identifier: {dev_id} (Status: {dev_status})")
+    print(f"[*] Selected Target Device: {dev_id} (Status: {dev_status})")
+
+    if args.check_only:
+        print(f"[+] Device query check completed: {dev_id} is {dev_status}")
+        return 0
 
     if dev_status == "unauthorized":
         print("\n[!] DEVICE STATUS: UNAUTHORIZED (RSA Key Approval Pending)")
@@ -158,13 +205,16 @@ def main():
         print("  4. Tap 'ALLOW'.")
         print("-" * 76)
         print()
-        input("Once approved on your phone, press Enter to re-check...")
-        return main()
+        if not args.non_interactive:
+            input("Once approved on your phone, press Enter to re-check...")
+            return main()
+        return 2
 
     if dev_status == "offline":
         print("\n[!] DEVICE STATUS: OFFLINE")
         print("    Please unplug and re-plug your USB cable or restart USB debugging.")
-        input("Press Enter to exit...")
+        if not args.non_interactive:
+            input("Press Enter to exit...")
         return 3
 
     if dev_status == "device":
@@ -174,7 +224,8 @@ def main():
         _, os_ver, _ = run_cmd([adb, "-s", dev_id, "shell", "getprop", "ro.build.version.release"])
         _, sdk_ver, _ = run_cmd([adb, "-s", dev_id, "shell", "getprop", "ro.build.version.sdk"])
         _, abi, _ = run_cmd([adb, "-s", dev_id, "shell", "getprop", "ro.product.cpu.abi"])
-        _, battery, _ = run_cmd([adb, "-s", dev_id, "shell", "dumpsys", "battery", "|", "grep", "level"])
+        _, batt_out, _ = run_cmd([adb, "-s", dev_id, "shell", "dumpsys", "battery"])
+        battery_level = parse_battery_level(batt_out)
 
         print("-" * 76)
         print(f"  TARGET DEVICE DETAILS:")
@@ -182,22 +233,29 @@ def main():
         print(f"  • Model:             {model}")
         print(f"  • Android OS:        Android {os_ver} (API {sdk_ver})")
         print(f"  • Architecture:      {abi}")
+        print(f"  • Battery Level:     {battery_level}")
         print("-" * 76)
 
         # Check existing installation
         _, pkg_list, _ = run_cmd([adb, "-s", dev_id, "shell", "pm", "list", "packages", PACKAGE_NAME])
         if PACKAGE_NAME in pkg_list:
-            _, installed_ver, _ = run_cmd([adb, "-s", dev_id, "shell", "dumpsys", "package", PACKAGE_NAME, "|", "grep", "versionName"])
-            print(f"[*] Existing Installation Detected: {installed_ver.strip()}")
+            _, installed_ver, _ = run_cmd([adb, "-s", dev_id, "shell", "dumpsys", "package", PACKAGE_NAME])
+            ver_name = "installed"
+            for line in installed_ver.splitlines():
+                if "versionName=" in line:
+                    ver_name = line.strip()
+                    break
+            print(f"[*] Existing Installation Detected: {ver_name}")
             print("[*] Safe non-destructive upgrade mode enabled (-r flag preserves all local settings & quarantine data).")
         else:
             print("[*] Performing fresh production installation.")
 
         print()
-        confirm = input(f"Install BI Antivirus Enterprise v1.1.0 on {mfg} {model}? [Y/n]: ").strip().lower()
-        if confirm and confirm != 'y':
-            print("Installation cancelled by user.")
-            return 0
+        if not args.non_interactive:
+            confirm = input(f"Install BI Antivirus Enterprise v1.1.0 on {mfg} {model}? [Y/n]: ").strip().lower()
+            if confirm and confirm != 'y':
+                print("Installation cancelled by user.")
+                return 0
 
         print("\n[*] Transferring and installing APK on device...")
         ret, out, err = run_cmd([adb, "-s", dev_id, "install", "-r", str(APK_PATH)])
@@ -205,22 +263,28 @@ def main():
             print("[+] INSTALLATION SUCCESSFUL!")
             print(f"    Package '{PACKAGE_NAME}' successfully deployed.")
 
-            launch = input("\nLaunch BI Antivirus Enterprise on device now? [Y/n]: ").strip().lower()
-            if not launch or launch == 'y':
-                print("[*] Launching main activity...")
+            if not args.non_interactive:
+                launch = input("\nLaunch BI Antivirus Enterprise on device now? [Y/n]: ").strip().lower()
+                if not launch or launch == 'y':
+                    print("[*] Launching main activity...")
+                    run_cmd([adb, "-s", dev_id, "shell", "am", "start", "-n", f"{PACKAGE_NAME}/{MAIN_ACTIVITY}"])
+                    print("[+] Application launched on device screen.")
+            else:
                 run_cmd([adb, "-s", dev_id, "shell", "am", "start", "-n", f"{PACKAGE_NAME}/{MAIN_ACTIVITY}"])
-                print("[+] Application launched on device screen.")
             
             print("\n[+] Setup complete. BI Antivirus Enterprise is active and protecting your device.")
-            input("Press Enter to close...")
+            if not args.non_interactive:
+                input("Press Enter to close...")
             return 0
         else:
             print(f"[-] Installation failed: {out} {err}")
-            input("Press Enter to close...")
+            if not args.non_interactive:
+                input("Press Enter to close...")
             return 4
 
     print(f"[-] Unexpected device status: {dev_status}")
-    input("Press Enter to close...")
+    if not args.non_interactive:
+        input("Press Enter to close...")
     return 5
 
 if __name__ == "__main__":
