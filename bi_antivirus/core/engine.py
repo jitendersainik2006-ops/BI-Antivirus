@@ -20,7 +20,9 @@ from bi_antivirus.config import (
     SCAN_TYPE_QUICK,
     SCAN_TYPE_FULL,
     SCAN_TYPE_CUSTOM,
+    SCAN_TYPE_DEEP,
 )
+from bi_antivirus.core.licensing import LicenseManager
 from bi_antivirus.database.signatures import SignatureDatabase
 from bi_antivirus.database.history import HistoryDatabase
 from bi_antivirus.core.detector import ThreatDetector
@@ -75,8 +77,9 @@ class AntivirusEngine:
         self.detector = ThreatDetector(signature_db=self.sig_db)
         self.quarantine_mgr = QuarantineManager()
 
-        # 4. Scanner Engine
+        # 4. Scanner Engine & Licensing
         self.scanner = FileScanner(detector=self.detector, history_db=self.history_db)
+        self.licensing = LicenseManager()
 
         # 5. Network & Web Protection
         self.web_shield = WebProtection(signature_db=self.sig_db)
@@ -497,9 +500,15 @@ class AntivirusEngine:
     # Scanning API
     def start_quick_scan(self, progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None) -> str:
         """Start Quick Scan in dedicated background worker thread."""
+        allowed, reason = self.licensing.can_perform_scan(SCAN_TYPE_QUICK)
+        if not allowed:
+            self.sec_logger.log_event("WARNING", "LICENSING", f"Quick Scan blocked: {reason}")
+            raise PermissionError(reason)
+
         if self.scanner.is_scanning:
             return self.scanner.current_session_id
 
+        self.licensing.record_scan_performed(SCAN_TYPE_QUICK)
         session_id = f"SCAN-{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4]}"
         self.scanner.current_session_id = session_id
 
@@ -529,9 +538,15 @@ class AntivirusEngine:
 
     def start_full_scan(self, progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None) -> str:
         """Start Full System Scan in dedicated background thread."""
+        allowed, reason = self.licensing.can_perform_scan(SCAN_TYPE_FULL)
+        if not allowed:
+            self.sec_logger.log_event("WARNING", "LICENSING", f"Full Scan blocked: {reason}")
+            raise PermissionError(reason)
+
         if self.scanner.is_scanning:
             return self.scanner.current_session_id
 
+        self.licensing.record_scan_performed(SCAN_TYPE_FULL)
         session_id = f"SCAN-{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4]}"
         self.scanner.current_session_id = session_id
 
@@ -559,15 +574,59 @@ class AntivirusEngine:
         self.active_scan_thread.start()
         return session_id
 
+    def start_deep_scan(self, progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None) -> str:
+        """Start Premium Deep Scan in dedicated background thread."""
+        allowed, reason = self.licensing.can_perform_scan(SCAN_TYPE_DEEP)
+        if not allowed:
+            self.sec_logger.log_event("WARNING", "LICENSING", f"Deep Scan blocked: {reason}")
+            raise PermissionError(reason)
+
+        if self.scanner.is_scanning:
+            return self.scanner.current_session_id
+
+        self.licensing.record_scan_performed(SCAN_TYPE_DEEP)
+        session_id = f"SCAN-{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4]}"
+        self.scanner.current_session_id = session_id
+
+        def _worker():
+            try:
+                self._update_system_status()
+                self.sec_logger.log_event("INFO", "SCANNER", f"Premium Deep Scan started ({session_id}).")
+                res = self.scanner.scan_deep(progress_cb=progress_cb)
+                self._update_system_status()
+                self.sec_logger.log_event(
+                    "INFO",
+                    "SCANNER",
+                    f"Premium Deep Scan completed. Files: {res['files_scanned']}, Threats: {res['threats_count']}",
+                )
+
+                for t in res.get("threats", []):
+                    self.dispatcher.emit_threat_event(t, scan_id=res["session_id"])
+
+                self.voice.announce_scan_completed(res["files_scanned"], res["threats_count"])
+            except Exception as e:
+                self.sec_logger.log_event("ERROR", "SCANNER", f"Premium Deep Scan error: {e}")
+                self._update_system_status()
+
+        self.active_scan_thread = threading.Thread(target=_worker, daemon=True, name="BI-DeepScanThread")
+        self.active_scan_thread.start()
+        return session_id
+
     def start_custom_scan(
         self,
         target_path: Path,
         progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> str:
         """Start Custom Path Scan."""
+        allowed, reason = self.licensing.can_perform_scan(SCAN_TYPE_CUSTOM)
+        if not allowed:
+            self.sec_logger.log_event("WARNING", "LICENSING", f"Custom Scan blocked: {reason}")
+            raise PermissionError(reason)
+
         if self.scanner.is_scanning:
             return self.scanner.current_session_id
 
+        self.licensing.record_scan_performed(SCAN_TYPE_CUSTOM)
         session_id = f"SCAN-{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:4]}"
         self.scanner.current_session_id = session_id
 

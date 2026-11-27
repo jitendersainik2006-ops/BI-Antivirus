@@ -87,9 +87,13 @@ class AboutView(tk.Frame):
         )
         app_title.pack(fill="x")
 
+        edition = "Enterprise Edition"
+        if hasattr(self.engine, "licensing"):
+            edition = "Premium Edition" if self.engine.licensing.is_premium() else "Free Edition"
+
         app_ver = tk.Label(
             info_col,
-            text=f"Version {APP_VERSION}  |  Engine {ENGINE_VERSION}  |  Enterprise Edition",
+            text=f"Version {APP_VERSION}  |  Engine {ENGINE_VERSION}  |  {edition}",
             bg=THEME["bg_panel"],
             fg=THEME["text_secondary"],
             font=(THEME["font_family"], 10),

@@ -44,6 +44,9 @@ class BIAntivirusApp : Application() {
     lateinit var securityScoreEngine: SecurityScoreEngine
         private set
 
+    lateinit var licenseManager: com.biantivirus.security.core.LicenseManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -51,6 +54,7 @@ class BIAntivirusApp : Application() {
         preferencesManager = PreferencesManager(this)
         historyDatabase = ScanHistoryDatabase(this)
         quarantineManager = QuarantineManager(this)
+        licenseManager = com.biantivirus.security.core.LicenseManager(this)
 
         signatureDatabase = SignatureDatabase(this)
         signatureDatabase.loadSignatures()

@@ -64,6 +64,13 @@ SCAN_TYPE_QUICK = "QUICK"
 SCAN_TYPE_FULL = "FULL"
 SCAN_TYPE_CUSTOM = "CUSTOM"
 SCAN_TYPE_REALTIME = "REALTIME"
+SCAN_TYPE_DEEP = "DEEP"
+
+# Product Edition Constants
+EDITION_FREE = "FREE"
+EDITION_PREMIUM = "PREMIUM"
+DEFAULT_MAX_FREE_SCANS_PER_DAY = 5
+LICENSE_ENTITLEMENT_PATH = DATA_DIR / "license_entitlement.json"
 
 # Threat Families
 FAMILY_TROJAN = "Trojan"
@@ -118,6 +125,8 @@ THEME = {
 
 # Default System Configuration
 DEFAULT_SETTINGS = {
+    "edition": "FREE",
+    "max_free_scans_per_day": 5,
     "realtime_protection_enabled": True,
     "web_protection_enabled": True,
     "heuristic_analysis_enabled": True,

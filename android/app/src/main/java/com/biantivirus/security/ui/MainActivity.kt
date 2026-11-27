@@ -41,7 +41,8 @@ enum class CurrentScreen {
     HISTORY,
     SETTINGS,
     PRIVACY,
-    OEM_SHIELD
+    OEM_SHIELD,
+    LICENSE
 }
 
 class MainActivity : ComponentActivity() {
@@ -64,6 +65,7 @@ class MainActivity : ComponentActivity() {
     private var isPrivacyAuditing by mutableStateOf(false)
     private var oemStatus by mutableStateOf<OEMBackgroundStatus?>(null)
     private var securityScoreReport by mutableStateOf<SecurityScoreReport?>(null)
+    private var licenseSummary by mutableStateOf<com.biantivirus.security.core.LicenseStatusSummary?>(null)
 
     // Quarantine States
     private var quarantineRecords by mutableStateOf<List<QuarantineRecord>>(emptyList())
@@ -90,6 +92,7 @@ class MainActivity : ComponentActivity() {
         // Pre-load active quarantine items
         quarantineRecords = app.quarantineManager.getActiveQuarantinedItems()
         oemStatus = app.oemBackgroundManager.getBackgroundStatus()
+        licenseSummary = app.licenseManager.getStatusSummary()
 
         // Initial security health score calculation
         refreshSecurityScore()
@@ -111,6 +114,7 @@ class MainActivity : ComponentActivity() {
 
                     CurrentScreen.DASHBOARD -> DashboardScreen(
                         scoreReport = securityScoreReport,
+                        licenseSummary = licenseSummary,
                         onScanAllAppsClick = {
                             currentScreen = CurrentScreen.SCANNER
                             startAppScan()
@@ -135,6 +139,10 @@ class MainActivity : ComponentActivity() {
                             currentScreen = CurrentScreen.QUARANTINE
                         },
                         onHistoryClick = { currentScreen = CurrentScreen.HISTORY },
+                        onLicenseClick = {
+                            licenseSummary = app.licenseManager.getStatusSummary()
+                            currentScreen = CurrentScreen.LICENSE
+                        },
                         onSettingsClick = { currentScreen = CurrentScreen.SETTINGS }
                     )
 
@@ -215,6 +223,23 @@ class MainActivity : ComponentActivity() {
                         prefs = app.preferencesManager,
                         onBackClick = { currentScreen = CurrentScreen.DASHBOARD }
                     )
+
+                    CurrentScreen.LICENSE -> {
+                        val summary = licenseSummary ?: app.licenseManager.getStatusSummary()
+                        LicenseScreen(
+                            status = summary,
+                            onActivateKey = { key ->
+                                val res = app.licenseManager.activate(key)
+                                licenseSummary = app.licenseManager.getStatusSummary()
+                                res
+                            },
+                            onDeactivate = {
+                                app.licenseManager.deactivate()
+                                licenseSummary = app.licenseManager.getStatusSummary()
+                            },
+                            onBackClick = { currentScreen = CurrentScreen.DASHBOARD }
+                        )
+                    }
                 }
             }
         }
@@ -251,9 +276,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startAppScan() {
+        val (allowed, reason) = app.licenseManager.canPerformScan(isDeepScan = false)
+        if (!allowed) {
+            Toast.makeText(this@MainActivity, reason, Toast.LENGTH_LONG).show()
+            licenseSummary = app.licenseManager.getStatusSummary()
+            currentScreen = CurrentScreen.LICENSE
+            return
+        }
+
         if (isAppScanning) return
         isAppScanning = true
         appScanProgress = null
+        app.licenseManager.recordScanPerformed(isDeepScan = false)
+        licenseSummary = app.licenseManager.getStatusSummary()
 
         lifecycleScope.launch(Dispatchers.IO) {
             val results = app.appScannerEngine.scanAllApps(
@@ -278,6 +313,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun scanDocumentUri(uri: Uri) {
+        val (allowed, reason) = app.licenseManager.canPerformScan(isDeepScan = false)
+        if (!allowed) {
+            Toast.makeText(this@MainActivity, reason, Toast.LENGTH_LONG).show()
+            licenseSummary = app.licenseManager.getStatusSummary()
+            currentScreen = CurrentScreen.LICENSE
+            return
+        }
+        app.licenseManager.recordScanPerformed(isDeepScan = false)
+        licenseSummary = app.licenseManager.getStatusSummary()
+
         isScanning = true
         lifecycleScope.launch(Dispatchers.IO) {
             var fileName = "document"
@@ -321,6 +366,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun scanDocumentTree(treeUri: Uri) {
+        val (allowed, reason) = app.licenseManager.canPerformScan(isDeepScan = false)
+        if (!allowed) {
+            Toast.makeText(this@MainActivity, reason, Toast.LENGTH_LONG).show()
+            licenseSummary = app.licenseManager.getStatusSummary()
+            currentScreen = CurrentScreen.LICENSE
+            return
+        }
+        app.licenseManager.recordScanPerformed(isDeepScan = false)
+        licenseSummary = app.licenseManager.getStatusSummary()
+
         isScanning = true
         lifecycleScope.launch(Dispatchers.IO) {
             try {

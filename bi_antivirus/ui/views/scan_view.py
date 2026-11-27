@@ -9,7 +9,15 @@ from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 
-from bi_antivirus.config import THEME
+from bi_antivirus.config import (
+    THEME,
+    SCAN_TYPE_DEEP,
+    SCAN_TYPE_QUICK,
+    SCAN_TYPE_FULL,
+    SCAN_TYPE_CUSTOM,
+    EDITION_FREE,
+    EDITION_PREMIUM,
+)
 
 
 class ScanView(tk.Frame):
@@ -32,6 +40,7 @@ class ScanView(tk.Frame):
         self.on_start_custom_scan = on_start_custom_scan
         self.on_navigate = on_navigate
         self._build_ui()
+        self._update_quota_display()
 
     def _build_ui(self) -> None:
         # 1. Header & Launch Controls Box
@@ -73,6 +82,14 @@ class ScanView(tk.Frame):
         )
         self.btn_run_full.pack(side="left", padx=(0, 6))
 
+        self.btn_run_deep = ttk.Button(
+            launch_btns,
+            text="💎 Deep Scan",
+            style="Secondary.TButton",
+            command=self._launch_deep,
+        )
+        self.btn_run_deep.pack(side="left", padx=(0, 6))
+
         self.btn_run_custom = ttk.Button(
             launch_btns,
             text="📁 Custom Scan...",
@@ -80,6 +97,44 @@ class ScanView(tk.Frame):
             command=self._launch_custom,
         )
         self.btn_run_custom.pack(side="left")
+
+        # Edition & Scan Allowance Quota Banner
+        self.quota_frame = tk.Frame(header_frame, bg=THEME["bg_panel"])
+        self.quota_frame.pack(fill="x", pady=(10, 4))
+
+        self.quota_badge = tk.Label(
+            self.quota_frame,
+            text="[FREE EDITION]",
+            bg="#222530",
+            fg=THEME["accent_primary"],
+            font=(THEME["font_family"], 9, "bold"),
+            padx=8,
+            pady=2,
+        )
+        self.quota_badge.pack(side="left", padx=(0, 8))
+
+        self.quota_text = tk.Label(
+            self.quota_frame,
+            text="Checking scan allowance...",
+            bg=THEME["bg_panel"],
+            fg=THEME["text_secondary"],
+            font=(THEME["font_family"], 9),
+        )
+        self.quota_text.pack(side="left")
+
+        self.btn_activate_prem = tk.Button(
+            self.quota_frame,
+            text="Upgrade to Premium 💎",
+            bg=THEME["bg_panel"],
+            fg=THEME["accent_primary"],
+            activebackground=THEME["bg_panel_hover"],
+            activeforeground=THEME["accent_hover"],
+            font=(THEME["font_family"], 9, "underline"),
+            bd=0,
+            cursor="hand2",
+            command=self._open_activation_dialog,
+        )
+        self.btn_activate_prem.pack(side="right")
 
         self.scan_desc_lbl = tk.Label(
             header_frame,
@@ -259,19 +314,71 @@ class ScanView(tk.Frame):
         )
         self.help_lbl.pack(side="left", fill="x", expand=True)
 
+    def _update_quota_display(self) -> None:
+        """Update quota badge and remaining scans display."""
+        if not hasattr(self.engine, "licensing"):
+            return
+        summary = self.engine.licensing.get_status_summary()
+        edition = summary.get("edition", "FREE")
+        if edition == "PREMIUM":
+            self.quota_badge.config(text="[PREMIUM ACTIVATED]", bg="#183020", fg=THEME["status_safe"])
+            self.quota_text.config(text="Unlimited Deep Defense & Real-Time Monitoring active")
+            self.btn_activate_prem.config(text="Subscription Details ℹ️")
+        else:
+            remaining = summary.get("remaining_scans", 0)
+            max_s = summary.get("max_free_scans_per_day", 5)
+            reset_txt = summary.get("reset_time_text", "midnight")
+            self.quota_badge.config(text="[FREE EDITION]", bg="#222530", fg=THEME["accent_primary"])
+            self.quota_text.config(text=f"{remaining} of {max_s} daily scans remaining (resets in {reset_txt})")
+            self.btn_activate_prem.config(text="Upgrade to Premium 💎")
+
     def _launch_quick(self) -> None:
+        if hasattr(self.engine, "licensing"):
+            allowed, msg = self.engine.licensing.can_perform_scan(SCAN_TYPE_QUICK)
+            if not allowed:
+                messagebox.showwarning("Free Edition Scan Allowance", msg)
+                self._open_activation_dialog()
+                return
+
         if self.on_start_quick_scan:
             self.on_start_quick_scan()
         else:
             self.engine.start_quick_scan(progress_cb=self.update_progress)
+        self._update_quota_display()
 
     def _launch_full(self) -> None:
+        if hasattr(self.engine, "licensing"):
+            allowed, msg = self.engine.licensing.can_perform_scan(SCAN_TYPE_FULL)
+            if not allowed:
+                messagebox.showwarning("Free Edition Scan Allowance", msg)
+                self._open_activation_dialog()
+                return
+
         if self.on_start_full_scan:
             self.on_start_full_scan()
         else:
             self.engine.start_full_scan(progress_cb=self.update_progress)
+        self._update_quota_display()
+
+    def _launch_deep(self) -> None:
+        if hasattr(self.engine, "licensing"):
+            allowed, msg = self.engine.licensing.can_perform_scan(SCAN_TYPE_DEEP)
+            if not allowed:
+                messagebox.showinfo("BI Antivirus Premium Feature", msg)
+                self._open_activation_dialog()
+                return
+
+        self.engine.start_deep_scan(progress_cb=self.update_progress)
+        self._update_quota_display()
 
     def _launch_custom(self) -> None:
+        if hasattr(self.engine, "licensing"):
+            allowed, msg = self.engine.licensing.can_perform_scan(SCAN_TYPE_CUSTOM)
+            if not allowed:
+                messagebox.showwarning("Free Edition Scan Allowance", msg)
+                self._open_activation_dialog()
+                return
+
         folder = filedialog.askdirectory(title="Select Folder to Scan with BI Antivirus")
         if folder:
             p = Path(folder)
@@ -279,6 +386,138 @@ class ScanView(tk.Frame):
                 self.on_start_custom_scan(p)
             else:
                 self.engine.start_custom_scan(p, progress_cb=self.update_progress)
+            self._update_quota_display()
+
+    def _open_activation_dialog(self) -> None:
+        """Open Premium Upgrade and License Activation Dialog."""
+        dialog = tk.Toplevel(self)
+        dialog.title("BI Antivirus Enterprise — Upgrade & License Activation")
+        dialog.geometry("640x530")
+        dialog.configure(bg=THEME["bg_darkest"])
+        dialog.transient(self)
+        dialog.grab_set()
+
+        # Dialog Header
+        d_hdr = tk.Frame(dialog, bg=THEME["bg_panel"], padx=20, pady=16)
+        d_hdr.pack(fill="x", padx=16, pady=(16, 10))
+        d_hdr.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        tk.Label(
+            d_hdr,
+            text="BI ANTIVIRUS ENTERPRISE — PRODUCT EDITIONS",
+            bg=THEME["bg_panel"],
+            fg=THEME["accent_primary"],
+            font=(THEME["font_family"], 13, "bold"),
+            anchor="w",
+        ).pack(fill="x")
+
+        is_prem = self.engine.licensing.is_premium() if hasattr(self.engine, "licensing") else False
+        status_txt = "Status: PREMIUM ACTIVATED (Unlimited Defense)" if is_prem else "Status: FREE EDITION (5 Scans/Day Allowance)"
+        tk.Label(
+            d_hdr,
+            text=status_txt,
+            bg=THEME["bg_panel"],
+            fg=THEME["status_safe"] if is_prem else THEME["text_secondary"],
+            font=(THEME["font_family"], 10),
+            anchor="w",
+        ).pack(fill="x", pady=(4, 0))
+
+        # Comparison Card
+        comp_frame = tk.Frame(dialog, bg=THEME["bg_panel"], padx=16, pady=12)
+        comp_frame.pack(fill="both", expand=True, padx=16, pady=6)
+        comp_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        tk.Label(
+            comp_frame,
+            text="EDITION CAPABILITY COMPARISON",
+            bg=THEME["bg_panel"],
+            fg=THEME["text_primary"],
+            font=(THEME["font_family"], 10, "bold"),
+            anchor="w",
+        ).pack(fill="x", pady=(0, 6))
+
+        comparisons = [
+            ("Feature", "Free Edition", "Premium Edition"),
+            ("Daily Scan Allowance", "5 Scans / Day (Midnight reset)", "Unlimited On-Demand Scans"),
+            ("Quick Scan", "Included", "Included"),
+            ("Full System Scan", "Included (Within quota)", "Included (Unlimited)"),
+            ("Premium Deep Scan", "Locked", "Unlocked (Deep Heuristics)"),
+            ("Ransomware Shield & Canaries", "Essential", "Advanced Heuristics & Decoys"),
+            ("Quarantine Vault", "Encrypted AES-256", "Encrypted AES-256 with Deep Analysis"),
+            ("Audit & Threat Reports", "Basic Summary", "Exportable Detailed JSON/HTML"),
+        ]
+
+        for i, (feat, free_c, prem_c) in enumerate(comparisons):
+            row = tk.Frame(comp_frame, bg=THEME["bg_panel"] if i % 2 == 0 else THEME["bg_dark"])
+            row.pack(fill="x", pady=1)
+            tk.Label(row, text=feat, bg=row["bg"], fg=THEME["text_primary"] if i == 0 else THEME["text_secondary"], font=(THEME["font_family"], 8, "bold" if i == 0 else "normal"), width=24, anchor="w").pack(side="left", padx=4)
+            tk.Label(row, text=free_c, bg=row["bg"], fg=THEME["text_muted"] if i == 0 else (THEME["status_threat"] if "Locked" in free_c else THEME["text_secondary"]), font=(THEME["font_family"], 8), width=24, anchor="w").pack(side="left", padx=4)
+            tk.Label(row, text=prem_c, bg=row["bg"], fg=THEME["accent_primary"] if i == 0 else THEME["status_safe"], font=(THEME["font_family"], 8, "bold" if i > 0 else "normal"), width=28, anchor="w").pack(side="left", padx=4)
+
+        # License Activation Input Frame
+        act_frame = tk.Frame(dialog, bg=THEME["bg_panel"], padx=16, pady=12)
+        act_frame.pack(fill="x", padx=16, pady=(6, 16))
+        act_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        tk.Label(
+            act_frame,
+            text="ENTER LICENSE ACTIVATION KEY",
+            bg=THEME["bg_panel"],
+            fg=THEME["accent_primary"],
+            font=(THEME["font_family"], 10, "bold"),
+            anchor="w",
+        ).pack(fill="x")
+
+        tk.Label(
+            act_frame,
+            text="Format: BI-PREM-XXXX-XXXX-XXXX-XXXX",
+            bg=THEME["bg_panel"],
+            fg=THEME["text_muted"],
+            font=(THEME["font_family"], 8),
+            anchor="w",
+        ).pack(fill="x", pady=(2, 6))
+
+        key_row = tk.Frame(act_frame, bg=THEME["bg_panel"])
+        key_row.pack(fill="x")
+
+        key_entry = tk.Entry(
+            key_row,
+            bg=THEME["bg_input"],
+            fg=THEME["accent_primary"],
+            insertbackground=THEME["accent_primary"],
+            font=(THEME["font_mono"], 11),
+            bd=1,
+            relief="solid",
+            highlightthickness=1,
+            highlightcolor=THEME["border_highlight"],
+        )
+        key_entry.pack(side="left", fill="x", expand=True, padx=(0, 10), ipady=4)
+
+        if is_prem:
+            key_entry.insert(0, self.engine.licensing.get_status_summary().get("license_key") or "")
+
+        def _do_activate():
+            k = key_entry.get().strip()
+            ok, msg = self.engine.licensing.activate(k)
+            if ok:
+                messagebox.showinfo("Activation Successful", msg)
+                self._update_quota_display()
+                dialog.destroy()
+            else:
+                messagebox.showerror("Activation Failed", msg)
+
+        def _do_deactivate():
+            ok, msg = self.engine.licensing.deactivate()
+            messagebox.showinfo("License Status", msg)
+            self._update_quota_display()
+            dialog.destroy()
+
+        btn_act = ttk.Button(key_row, text="Activate Key", style="Primary.TButton", command=_do_activate)
+        btn_act.pack(side="left", padx=(0, 6))
+
+        if is_prem:
+            btn_deact = ttk.Button(key_row, text="Deactivate", style="Secondary.TButton", command=_do_deactivate)
+            btn_deact.pack(side="left")
 
     def update_progress(self, p: Dict[str, Any]) -> None:
         """Called by scanner worker callback."""
@@ -294,12 +533,15 @@ class ScanView(tk.Frame):
             self.scan_desc_lbl.config(text=f"Scanning in progress ({scan_type} Scan)...")
             self.btn_run_quick.state(["disabled"])
             self.btn_run_full.state(["disabled"])
+            self.btn_run_deep.state(["disabled"])
             self.btn_run_custom.state(["disabled"])
         else:
             self.progress_bar.stop()
             self.btn_run_quick.state(["!disabled"])
             self.btn_run_full.state(["!disabled"])
+            self.btn_run_deep.state(["!disabled"])
             self.btn_run_custom.state(["!disabled"])
+            self._update_quota_display()
 
             # Show completion summary
             self.summary_frame.pack(fill="x", padx=20, pady=(0, 10), before=self.tree.master.master)

@@ -19,6 +19,7 @@ from bi_antivirus.config import (
     SCAN_TYPE_QUICK,
     SCAN_TYPE_FULL,
     SCAN_TYPE_CUSTOM,
+    SCAN_TYPE_DEEP,
     load_settings,
 )
 from bi_antivirus.core.detector import ThreatDetector
@@ -187,6 +188,34 @@ class FileScanner:
 
         return self._run_scan_pipeline(targets, scan_type=SCAN_TYPE_FULL, progress_cb=progress_cb)
 
+    def scan_deep(
+        self,
+        progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute Premium Deep Scan.
+        Deep recursive inspection across user libraries, startup locations,
+        and system binaries with full heuristic analysis and PE structure profiling.
+        """
+        targets = []
+        user_home = Path(os.path.expanduser("~"))
+        if user_home.exists():
+            for folder in ["Documents", "Downloads", "Desktop", "Pictures", "Videos", "Music"]:
+                p = user_home / folder
+                if p.exists():
+                    targets.append(p)
+            targets.append(user_home / "AppData" / "Local" / "Temp")
+            targets.append(user_home / "AppData" / "Roaming" / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup")
+
+        if PROJECT_ROOT.exists():
+            targets.append(PROJECT_ROOT)
+
+        win_temp = Path(r"C:\Windows\Temp")
+        if win_temp.exists():
+            targets.append(win_temp)
+
+        return self._run_scan_pipeline(targets, scan_type=SCAN_TYPE_DEEP, progress_cb=progress_cb)
+
     def _run_scan_pipeline(
         self,
         targets: List[Path],
@@ -203,6 +232,10 @@ class FileScanner:
         self.files_scanned = 0
         self.threats_found = []
         self.skipped_files_count = 0
+        self.inaccessible_files_count = 0
+        self.unsupported_files_count = 0
+        self.suspicious_files_count = 0
+        self.confirmed_detections_count = 0
         self.total_bytes_scanned = 0
         self.start_time = time.time()
         self.progress_callback = progress_cb
@@ -261,6 +294,13 @@ class FileScanner:
 
                 if result.get("is_threat"):
                     self.threats_found.append(result)
+                    method = str(result.get("detection_method", ""))
+                    sev = str(result.get("severity", ""))
+                    if "SIG:" in method or sev == "CRITICAL":
+                        self.confirmed_detections_count += 1
+                    else:
+                        self.suspicious_files_count += 1
+
                     # Record in History Database
                     self.history_db.record_threat(
                         session_id=self.current_session_id,
@@ -276,6 +316,7 @@ class FileScanner:
 
             except (PermissionError, FileNotFoundError, OSError):
                 self.skipped_files_count += 1
+                self.inaccessible_files_count += 1
                 continue
             except Exception:
                 self.skipped_files_count += 1
@@ -310,8 +351,13 @@ class FileScanner:
             "status": status,
             "duration_seconds": duration,
             "files_scanned": self.files_scanned,
+            "total_examined": len(all_file_paths),
             "threats_count": len(self.threats_found),
             "threats": self.threats_found,
             "bytes_scanned": self.total_bytes_scanned,
             "skipped_files": self.skipped_files_count,
+            "inaccessible_files": self.inaccessible_files_count,
+            "unsupported_files": self.unsupported_files_count,
+            "suspicious_files": self.suspicious_files_count,
+            "confirmed_detections": self.confirmed_detections_count,
         }

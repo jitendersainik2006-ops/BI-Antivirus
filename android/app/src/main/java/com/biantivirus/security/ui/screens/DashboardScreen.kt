@@ -22,12 +22,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.biantivirus.security.R
+import com.biantivirus.security.core.LicenseStatusSummary
 import com.biantivirus.security.core.SecurityScoreReport
 import com.biantivirus.security.ui.theme.*
 
 @Composable
 fun DashboardScreen(
     scoreReport: SecurityScoreReport?,
+    licenseSummary: LicenseStatusSummary?,
     onScanAllAppsClick: () -> Unit,
     onScanDocumentClick: () -> Unit,
     onScanDirectoryClick: () -> Unit,
@@ -36,6 +38,7 @@ fun DashboardScreen(
     onOEMShieldClick: () -> Unit,
     onQuarantineClick: () -> Unit,
     onHistoryClick: () -> Unit,
+    onLicenseClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -91,8 +94,28 @@ fun DashboardScreen(
                         )
                     }
                 }
-                IconButton(onClick = onSettingsClick) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = GoldAccent)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val isPrem = licenseSummary?.isPremium ?: false
+                    val remaining = licenseSummary?.remainingScans ?: 5
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isPrem) StatusSafe.copy(alpha = 0.15f) else BgCard)
+                            .border(1.dp, if (isPrem) StatusSafe else GoldAccent, RoundedCornerShape(12.dp))
+                            .clickable { onLicenseClick() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isPrem) "PREMIUM 💎" else "FREE ($remaining/5)",
+                            color = if (isPrem) StatusSafe else GoldAccent,
+                            fontSize = 11.sp,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = GoldAccent)
+                    }
                 }
             }
 
