@@ -29,7 +29,9 @@ data class InstalledAppThreat(
     val threatFamily: String?,
     val severity: ThreatSeverity,
     val matchedRules: List<String>,
-    val suspiciousPermissions: List<String>
+    val suspiciousPermissions: List<String>,
+    val confidenceScore: Int = 0,
+    val explainableReason: String = ""
 )
 
 data class AppScanProgress(
@@ -175,7 +177,9 @@ class AppScannerEngine(
                 threatFamily = sigMatch.family,
                 severity = sigMatch.severity,
                 matchedRules = listOf("SIG:EXACT_HASH_MATCH (${sigMatch.id})"),
-                suspiciousPermissions = emptyList()
+                suspiciousPermissions = emptyList(),
+                confidenceScore = 99,
+                explainableReason = "Exact cryptographic hash match found in Black Intel threat intelligence database (${sigMatch.id}). Confirmed malicious package signature."
             )
             recordThreatInHistory(threat)
             return threat
@@ -196,6 +200,8 @@ class AppScannerEngine(
         var threatName: String? = null
         var threatFamily: String? = null
         var severity = ThreatSeverity.NONE
+        var confidence = 5
+        var reason = "No known malicious signatures or hazardous permission abuse combinations detected."
 
         // Heuristic Banking Trojan Pattern: Accessibility + Overlay + SMS
         if (hasAccessibility && (hasOverlay || hasSms)) {
@@ -203,25 +209,33 @@ class AppScannerEngine(
             threatName = "Trojan.AndroidOS.Banker.Heur"
             threatFamily = "BankingTrojan"
             severity = ThreatSeverity.CRITICAL
+            confidence = 85
             matchedRules.add("HEUR:BANKING_TROJAN_PROFILE (Accessibility + Overlay/SMS intercept)")
+            reason = "Application requests Accessibility Service (BIND_ACCESSIBILITY_SERVICE) combined with SYSTEM_ALERT_WINDOW or SMS access. This behavior is strongly characteristic of overlay banking trojans and credential harvesting."
         } else if (hasOverlay && hasInstallPackages && !isSystem) {
             verdict = ScanVerdict.SUSPICIOUS
             threatName = "Dropper.AndroidOS.Generic"
             threatFamily = "Dropper"
             severity = ThreatSeverity.HIGH
+            confidence = 70
             matchedRules.add("HEUR:DROPPER_PROFILE (Overlay + RequestInstallPackages)")
+            reason = "Application requests permission to overlay system windows and trigger APK installations, matching known dropper/loader staging patterns."
         } else if (hasDeviceAdmin && hasSms && !isSystem) {
             verdict = ScanVerdict.SUSPICIOUS
             threatName = "Spyware.AndroidOS.SmsStealer"
             threatFamily = "Spyware"
             severity = ThreatSeverity.HIGH
+            confidence = 75
             matchedRules.add("HEUR:SMS_STEALER_PROFILE (DeviceAdmin + SMS Access)")
+            reason = "Application requests Device Administrator privileges alongside SMS interception capabilities, characteristic of persistent SMS spyware."
         } else if (suspiciousPerms.size >= 5 && !isSystem) {
             verdict = ScanVerdict.SUSPICIOUS
             threatName = "Heuristic.HighRiskPermissions"
             threatFamily = "PrivilegeAbuse"
             severity = ThreatSeverity.MEDIUM
+            confidence = 45
             matchedRules.add("HEUR:EXCESSIVE_DANGEROUS_PERMISSIONS (${suspiciousPerms.size} high-risk)")
+            reason = "Application requests ${suspiciousPerms.size} high-risk permissions without matching a specific known malware family. User review recommended before granting runtime privileges."
         }
 
         val result = InstalledAppThreat(
@@ -239,7 +253,9 @@ class AppScannerEngine(
             threatFamily = threatFamily,
             severity = severity,
             matchedRules = matchedRules,
-            suspiciousPermissions = suspiciousPerms
+            suspiciousPermissions = suspiciousPerms,
+            confidenceScore = confidence,
+            explainableReason = reason
         )
 
         if (verdict != ScanVerdict.CLEAN) {

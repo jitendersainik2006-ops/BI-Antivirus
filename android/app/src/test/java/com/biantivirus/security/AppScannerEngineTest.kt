@@ -38,6 +38,8 @@ class AppScannerEngineTest {
         assertEquals(ScanVerdict.CLEAN, result.verdict)
         assertEquals(ThreatSeverity.NONE, result.severity)
         assertTrue(result.matchedRules.isEmpty())
+        assertTrue(result.confidenceScore <= 10)
+        assertTrue(result.explainableReason.isNotEmpty())
     }
 
     @Test
@@ -61,6 +63,8 @@ class AppScannerEngineTest {
         assertEquals(ThreatSeverity.CRITICAL, result.severity)
         assertEquals("Trojan.AndroidOS.Banker.Heur", result.threatName)
         assertTrue(result.matchedRules.any { it.contains("BANKING_TROJAN_PROFILE") })
+        assertEquals(85, result.confidenceScore)
+        assertTrue(result.explainableReason.contains("Accessibility", ignoreCase = true))
     }
 
     @Test
@@ -83,6 +87,8 @@ class AppScannerEngineTest {
         assertEquals(ThreatSeverity.HIGH, result.severity)
         assertEquals("Dropper.AndroidOS.Generic", result.threatName)
         assertTrue(result.matchedRules.any { it.contains("DROPPER_PROFILE") })
+        assertEquals(70, result.confidenceScore)
+        assertTrue(result.explainableReason.contains("dropper"))
     }
 
     @Test
@@ -106,5 +112,7 @@ class AppScannerEngineTest {
         assertEquals(ThreatSeverity.HIGH, result.severity)
         assertEquals("Spyware.AndroidOS.SmsStealer", result.threatName)
         assertTrue(result.matchedRules.any { it.contains("SMS_STEALER_PROFILE") })
+        assertEquals(75, result.confidenceScore)
+        assertTrue(result.explainableReason.contains("SMS"))
     }
 }

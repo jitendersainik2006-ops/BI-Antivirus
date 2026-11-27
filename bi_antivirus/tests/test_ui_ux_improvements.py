@@ -55,6 +55,13 @@ class TestUIUXImprovements(unittest.TestCase):
         self.engine = AntivirusEngine()
         self.engine.initialize()
 
+    def tearDown(self):
+        if hasattr(self, "engine") and self.engine:
+            try:
+                self.engine.shutdown()
+            except Exception:
+                pass
+
     def test_01_dashboard_navigation_structure(self):
         """Verify AntivirusDashboard exposes exactly the 7 clean top-level navigation sections."""
         app = AntivirusDashboard(engine=self.engine)

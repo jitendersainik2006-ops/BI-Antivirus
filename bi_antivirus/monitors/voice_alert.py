@@ -116,6 +116,10 @@ class VoiceAlertService:
 
     def _speak_sapi(self, text: str, volume: int) -> None:
         """Render speech via Windows Native SAPI System.Speech."""
+        # In automated test or non-interactive environments, avoid spawning heavy powershell processes
+        if os.environ.get("BI_TEST_MODE") or "unittest" in sys.modules:
+            return
+
         try:
             # Sanitize text for PowerShell string literal
             safe_text = text.replace("'", "''").replace('"', '`"')

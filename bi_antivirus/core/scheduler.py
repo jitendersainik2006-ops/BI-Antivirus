@@ -70,6 +70,18 @@ class ScanScheduler:
                         if now_time_str == target_time:
                             if not last_run or not last_run.startswith(today_str):
                                 should_run = True
+                    elif frequency == "weekly":
+                        # Run weekly (default day 6 = Sunday)
+                        target_day = int(task.get("day_of_week", 6))
+                        if now.weekday() == target_day and now_time_str == target_time:
+                            if not last_run or not last_run.startswith(today_str):
+                                should_run = True
+
+                    # Catch-up for missed scheduled scans
+                    if task.get("catch_up_missed", False) and not should_run:
+                        if not last_run or not last_run.startswith(today_str):
+                            if now_time_str > target_time:
+                                should_run = True
 
                     if should_run:
                         task["last_run"] = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -85,6 +97,20 @@ class ScanScheduler:
 
             # Wait 30 seconds or until stopped
             self._stop_event.wait(30.0)
+
+    def run_task_now(self, task_id: Optional[str] = None) -> bool:
+        """Immediately trigger a scheduled scan task."""
+        settings = load_settings()
+        schedules = settings.get("scheduled_scans", [])
+        for task in schedules:
+            if not task_id or task.get("id") == task_id:
+                scan_type = task.get("type", SCAN_TYPE_QUICK)
+                task["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                save_settings(settings)
+                if self.on_trigger_scan:
+                    threading.Thread(target=self.on_trigger_scan, args=(scan_type,), daemon=True).start()
+                return True
+        return False
 
     @staticmethod
     def get_configured_schedules() -> List[Dict[str, Any]]:

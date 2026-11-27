@@ -307,12 +307,39 @@ fun ScannerScreen(
 
                                     if (isThreat) {
                                         Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = "Threat: ${app.threatName ?: "Suspicious Application"}",
-                                            color = StatusThreat,
-                                            fontSize = 11.sp,
-                                            style = MaterialTheme.typography.titleSmall
-                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Threat: ${app.threatName ?: "Suspicious Application"}",
+                                                color = StatusThreat,
+                                                fontSize = 11.sp,
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
+                                            Surface(
+                                                color = GoldAccent.copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "Confidence: ${app.confidenceScore}%",
+                                                    color = GoldBright,
+                                                    fontSize = 10.sp,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        if (app.explainableReason.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            Text(
+                                                text = app.explainableReason,
+                                                color = TextSecondary,
+                                                fontSize = 10.sp,
+                                                lineHeight = 13.sp
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
                                         app.matchedRules.forEach { rule ->
                                             Text(" • $rule", color = GoldBright, fontSize = 10.sp)
                                         }
