@@ -97,7 +97,11 @@ class TestN8nConnectivity(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.engine = AntivirusEngine()
+        cls.engine.licensing._state["scans_used_today"] = 0
         cls.api_key = get_or_create_api_key()
+
+    def setUp(self):
+        self.engine.licensing._state["scans_used_today"] = 0
 
     def test_settings_unpaused_state(self):
         """Verify settings are in active (unpaused) state."""

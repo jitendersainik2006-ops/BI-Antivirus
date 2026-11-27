@@ -41,4 +41,10 @@ if not defined PY_EXE (
     exit /b 1
 )
 
-"%PY_EXE%" scripts\universal_android_installer.py
+if exist "%~dp0scripts\universal_android_installer.py" (
+    "%PY_EXE%" "%~dp0scripts\universal_android_installer.py"
+) else if exist "%~dp0..\..\scripts\universal_android_installer.py" (
+    "%PY_EXE%" "%~dp0..\..\scripts\universal_android_installer.py"
+) else (
+    "%PY_EXE%" scripts\universal_android_installer.py
+)

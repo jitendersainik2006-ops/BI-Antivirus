@@ -124,3 +124,10 @@ releases/Android/*.apk
 handover/
 handover/**
 
+# 15. License Issuer Private Keys (Strictly Isolated from Clients & Git)
+scripts/issuer/*private*
+*.pem
+*.class
+
+
+

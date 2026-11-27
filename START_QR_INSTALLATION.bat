@@ -31,4 +31,10 @@ if not defined PY_EXE (
     exit /b 1
 )
 
-"%PY_EXE%" scripts\qr_apk_server.py
+if exist "%~dp0scripts\qr_apk_server.py" (
+    "%PY_EXE%" "%~dp0scripts\qr_apk_server.py"
+) else if exist "%~dp0..\..\scripts\qr_apk_server.py" (
+    "%PY_EXE%" "%~dp0..\..\scripts\qr_apk_server.py"
+) else (
+    "%PY_EXE%" scripts\qr_apk_server.py
+)

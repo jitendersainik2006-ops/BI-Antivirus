@@ -24,9 +24,16 @@ except ImportError:
     qrcode = None
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-APK_PATH = PROJECT_ROOT / "build" / "staging_android" / "BI_Antivirus_Enterprise_v1.1.0.apk"
-if not APK_PATH.exists():
-    APK_PATH = PROJECT_ROOT / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
+_apk_candidates = [
+    PROJECT_ROOT / "BI_Antivirus_Enterprise_v1.1.0.apk",
+    PROJECT_ROOT / "handover" / "v1.1.0" / "BI_Antivirus_Enterprise_v1.1.0.apk",
+    PROJECT_ROOT / "build" / "staging_android" / "BI_Antivirus_Enterprise_v1.1.0.apk",
+    PROJECT_ROOT / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk",
+    PROJECT_ROOT.parent / "v1.1.0" / "BI_Antivirus_Enterprise_v1.1.0.apk",
+    Path(r"D:\bit defender\handover\v1.1.0\BI_Antivirus_Enterprise_v1.1.0.apk"),
+    Path(r"D:\bit defender\android\app\build\outputs\apk\release\app-release.apk"),
+]
+APK_PATH = next((p for p in _apk_candidates if p.exists()), _apk_candidates[0])
 
 QR_IMG_PATH = PROJECT_ROOT / "build" / "staging_android" / "download_qr_code.png"
 

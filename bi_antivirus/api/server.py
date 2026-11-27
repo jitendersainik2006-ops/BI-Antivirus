@@ -232,14 +232,20 @@ class LocalAPIRequestHandler(BaseHTTPRequestHandler):
                 return
 
             # Strict Security: Only execute predefined safe hotspot locations. Never arbitrary paths.
-            scan_id = engine.start_quick_scan()
-            data = {
-                "status": "STARTED",
-                "scan_id": scan_id or engine.scanner.current_session_id,
-                "scan_type": SCAN_TYPE_QUICK,
-                "message": "Quick Scan launched in background using safe predefined Windows hotspots",
-            }
-            self._send_json_response(202, data)
+            try:
+                scan_id = engine.start_quick_scan()
+                data = {
+                    "status": "STARTED",
+                    "scan_id": scan_id or engine.scanner.current_session_id,
+                    "scan_type": SCAN_TYPE_QUICK,
+                    "message": "Quick Scan launched in background using safe predefined Windows hotspots",
+                }
+                self._send_json_response(202, data)
+            except PermissionError as e:
+                self._send_json_response(403, {
+                    "error": "Quota Exceeded",
+                    "message": str(e),
+                })
             return
 
         # Route 5: POST /api/v1/voice/announce
