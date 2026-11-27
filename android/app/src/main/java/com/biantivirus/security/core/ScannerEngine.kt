@@ -112,6 +112,47 @@ class ScannerEngine(
                 return result
             }
 
+            // 5b. Safe Archive & Container Inspection (Zip Slip & Decompression Bomb Defense)
+            if (extension == "zip" || extension == "apk") {
+                val archiveInspector = ArchiveInspector()
+                val archiveCheck = archiveInspector.inspectZipStream(fileName, ByteArrayInputStream(rawBytes))
+                if (archiveCheck.isZipSlipAttempt) {
+                    val result = ScanResult(
+                        scanId = scanId,
+                        fileName = fileName,
+                        filePath = filePath,
+                        fileSize = totalBytes,
+                        sha256 = hashResult.sha256,
+                        md5 = hashResult.md5,
+                        entropy = entropy,
+                        verdict = ScanVerdict.THREAT_DETECTED,
+                        threatName = "Exploit.Archive.ZipSlip",
+                        threatFamily = "PathTraversal",
+                        severity = ThreatSeverity.CRITICAL,
+                        matchedRules = listOf("EXPLOIT:ZIP_SLIP_PATH_TRAVERSAL (${archiveCheck.suspiciousEntries.joinToString(", ")})")
+                    )
+                    historyDb?.recordScan(result)
+                    return result
+                } else if (archiveCheck.isZipBombAttempt) {
+                    val result = ScanResult(
+                        scanId = scanId,
+                        fileName = fileName,
+                        filePath = filePath,
+                        fileSize = totalBytes,
+                        sha256 = hashResult.sha256,
+                        md5 = hashResult.md5,
+                        entropy = entropy,
+                        verdict = ScanVerdict.THREAT_DETECTED,
+                        threatName = "DoS.Archive.ZipBomb",
+                        threatFamily = "ResourceExhaustion",
+                        severity = ThreatSeverity.HIGH,
+                        matchedRules = listOf("EXPLOIT:ZIP_BOMB_EXCEEDS_SAFETY_LIMIT")
+                    )
+                    historyDb?.recordScan(result)
+                    return result
+                }
+            }
+
             // 6. Magic Byte Header / Extension Spoofing Inspection
             val typeAnalysis = FileTypeChecker.analyze(fileName, rawBytes)
             if (typeAnalysis.isSpoofed) {

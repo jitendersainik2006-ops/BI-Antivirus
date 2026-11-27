@@ -16,8 +16,11 @@ import androidx.lifecycle.lifecycleScope
 import com.biantivirus.security.BIAntivirusApp
 import com.biantivirus.security.core.AppScanProgress
 import com.biantivirus.security.core.InstalledAppThreat
+import com.biantivirus.security.core.OEMBackgroundStatus
+import com.biantivirus.security.core.PrivacyAuditReport
 import com.biantivirus.security.core.QuarantineRecord
 import com.biantivirus.security.core.RestoreResult
+import com.biantivirus.security.core.SecurityScoreReport
 import com.biantivirus.security.model.DevicePosture
 import com.biantivirus.security.model.ScanResult
 import com.biantivirus.security.model.ScanVerdict
@@ -36,7 +39,9 @@ enum class CurrentScreen {
     POSTURE,
     QUARANTINE,
     HISTORY,
-    SETTINGS
+    SETTINGS,
+    PRIVACY,
+    OEM_SHIELD
 }
 
 class MainActivity : ComponentActivity() {
@@ -53,6 +58,12 @@ class MainActivity : ComponentActivity() {
     private var isAppScanning by mutableStateOf(false)
     private var appScanProgress by mutableStateOf<AppScanProgress?>(null)
     private var appScanResults by mutableStateOf<List<InstalledAppThreat>>(emptyList())
+
+    // Privacy & OEM States
+    private var privacyReport by mutableStateOf<PrivacyAuditReport?>(null)
+    private var isPrivacyAuditing by mutableStateOf(false)
+    private var oemStatus by mutableStateOf<OEMBackgroundStatus?>(null)
+    private var securityScoreReport by mutableStateOf<SecurityScoreReport?>(null)
 
     // Quarantine States
     private var quarantineRecords by mutableStateOf<List<QuarantineRecord>>(emptyList())
@@ -78,6 +89,10 @@ class MainActivity : ComponentActivity() {
 
         // Pre-load active quarantine items
         quarantineRecords = app.quarantineManager.getActiveQuarantinedItems()
+        oemStatus = app.oemBackgroundManager.getBackgroundStatus()
+
+        // Initial security health score calculation
+        refreshSecurityScore()
 
         // Show onboarding if not yet completed
         if (!app.preferencesManager.isFirstRunCompleted) {
@@ -95,6 +110,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     CurrentScreen.DASHBOARD -> DashboardScreen(
+                        scoreReport = securityScoreReport,
                         onScanAllAppsClick = {
                             currentScreen = CurrentScreen.SCANNER
                             startAppScan()
@@ -103,7 +119,16 @@ class MainActivity : ComponentActivity() {
                         onScanDirectoryClick = { openDocumentTreeLauncher.launch(null) },
                         onAuditPostureClick = {
                             currentPosture = postureAuditor.auditPosture()
+                            refreshSecurityScore()
                             currentScreen = CurrentScreen.POSTURE
+                        },
+                        onPrivacyClick = {
+                            currentScreen = CurrentScreen.PRIVACY
+                            runPrivacyAudit()
+                        },
+                        onOEMShieldClick = {
+                            oemStatus = app.oemBackgroundManager.getBackgroundStatus()
+                            currentScreen = CurrentScreen.OEM_SHIELD
                         },
                         onQuarantineClick = {
                             quarantineRecords = app.quarantineManager.getActiveQuarantinedItems()
@@ -127,9 +152,45 @@ class MainActivity : ComponentActivity() {
                     )
 
                     CurrentScreen.POSTURE -> {
-                        val posture = currentPosture ?: postureAuditor.auditPosture()
+                        val posture = currentPosture ?: postureAuditor.auditPosture().also { currentPosture = it }
                         PostureScreen(
                             posture = posture,
+                            onBackClick = { currentScreen = CurrentScreen.DASHBOARD }
+                        )
+                    }
+
+                    CurrentScreen.PRIVACY -> {
+                        val report = privacyReport ?: PrivacyAuditReport(
+                            totalAppsAudited = 0,
+                            highRiskAppsCount = 0,
+                            privacyScore = 100,
+                            profiles = emptyList(),
+                            categorizedApps = emptyMap()
+                        )
+                        PrivacyScreen(
+                            report = report,
+                            isAuditing = isPrivacyAuditing,
+                            onRefreshAudit = { runPrivacyAudit() },
+                            onManageApp = { pkg ->
+                                val intent = app.privacyAuditor.createAppDetailsIntent(pkg)
+                                startActivity(intent)
+                            },
+                            onBackClick = { currentScreen = CurrentScreen.DASHBOARD }
+                        )
+                    }
+
+                    CurrentScreen.OEM_SHIELD -> {
+                        val status = oemStatus ?: app.oemBackgroundManager.getBackgroundStatus()
+                        OEMShieldScreen(
+                            status = status,
+                            onConfigureClick = {
+                                val intent = app.oemBackgroundManager.createOptimizationIntent()
+                                try {
+                                    startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(this, "Cannot launch settings: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
                             onBackClick = { currentScreen = CurrentScreen.DASHBOARD }
                         )
                     }
@@ -159,6 +220,36 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun refreshSecurityScore() {
+        val threatCount = appScanResults.count { it.verdict == ScanVerdict.THREAT_DETECTED }
+        val suspiciousCount = appScanResults.count { it.verdict == ScanVerdict.SUSPICIOUS }
+        val posture = currentPosture ?: try { postureAuditor.auditPosture().also { currentPosture = it } } catch (_: Exception) { null }
+        val privReport = privacyReport
+        val sigCount = try { app.signatureDatabase.getSignatureCount() } catch (_: Exception) { 1 }
+
+        securityScoreReport = app.securityScoreEngine.calculateScore(
+            threatCount = threatCount,
+            suspiciousCount = suspiciousCount,
+            posture = posture,
+            privacyReport = privReport,
+            signatureCount = sigCount
+        )
+    }
+
+    private fun runPrivacyAudit() {
+        if (isPrivacyAuditing) return
+        isPrivacyAuditing = true
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val report = app.privacyAuditor.auditPrivacy(includeSystemApps = false)
+            withContext(Dispatchers.Main) {
+                privacyReport = report
+                isPrivacyAuditing = false
+                refreshSecurityScore()
+            }
+        }
+    }
+
     private fun startAppScan() {
         if (isAppScanning) return
         isAppScanning = true
@@ -174,6 +265,7 @@ class MainActivity : ComponentActivity() {
             withContext(Dispatchers.Main) {
                 appScanResults = results
                 isAppScanning = false
+                refreshSecurityScore()
                 val threats = results.count { it.verdict == ScanVerdict.THREAT_DETECTED || it.verdict == ScanVerdict.SUSPICIOUS }
                 val msg = if (threats > 0) {
                     "Audit finished: $threats threat(s) detected across ${results.size} apps!"
@@ -211,6 +303,7 @@ class MainActivity : ComponentActivity() {
                     withContext(Dispatchers.Main) {
                         lastScanResult = result
                         isScanning = false
+                        refreshSecurityScore()
                     }
                 } ?: run {
                     withContext(Dispatchers.Main) {
@@ -279,6 +372,7 @@ class MainActivity : ComponentActivity() {
 
                 withContext(Dispatchers.Main) {
                     isScanning = false
+                    refreshSecurityScore()
                     Toast.makeText(
                         this@MainActivity,
                         "Folder sweep finished: $scannedFiles files inspected, $threatsFound threats.",
@@ -324,6 +418,7 @@ class MainActivity : ComponentActivity() {
 
                     withContext(Dispatchers.Main) {
                         quarantineRecords = app.quarantineManager.getActiveQuarantinedItems()
+                        refreshSecurityScore()
                         Toast.makeText(this@MainActivity, "Threat isolated in AES-GCM vault & purged from storage.", Toast.LENGTH_LONG).show()
                         currentScreen = CurrentScreen.QUARANTINE
                     }
@@ -352,6 +447,7 @@ class MainActivity : ComponentActivity() {
                 when (result) {
                     is RestoreResult.Success -> {
                         quarantineRecords = app.quarantineManager.getActiveQuarantinedItems()
+                        refreshSecurityScore()
                         Toast.makeText(
                             this@MainActivity,
                             "File restored: ${result.restoredFile.name}\nLocation: ${result.restoredFile.parent}",
@@ -378,6 +474,7 @@ class MainActivity : ComponentActivity() {
     private fun deleteQuarantinedRecord(record: QuarantineRecord) {
         val deleted = app.quarantineManager.deleteQuarantinedItem(record.id)
         quarantineRecords = app.quarantineManager.getActiveQuarantinedItems()
+        refreshSecurityScore()
         if (deleted) {
             Toast.makeText(this, "Threat permanently purged from vault.", Toast.LENGTH_SHORT).show()
         }
