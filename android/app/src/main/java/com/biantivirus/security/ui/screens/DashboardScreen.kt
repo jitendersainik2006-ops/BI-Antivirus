@@ -24,7 +24,9 @@ import com.biantivirus.security.ui.theme.*
 
 @Composable
 fun DashboardScreen(
+    onScanAllAppsClick: () -> Unit,
     onScanDocumentClick: () -> Unit,
+    onScanDirectoryClick: () -> Unit,
     onAuditPostureClick: () -> Unit,
     onQuarantineClick: () -> Unit,
     onHistoryClick: () -> Unit,
@@ -50,7 +52,7 @@ fun DashboardScreen(
                     painter = painterResource(id = R.drawable.ic_black_intel_emblem),
                     contentDescription = "Black Intel Eagle Emblem",
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(46.dp)
                         .clip(RoundedCornerShape(10.dp))
                 )
                 Spacer(modifier = Modifier.width(12.dp))
@@ -75,7 +77,7 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Hero Status Card
+        // Hero Status Card (Bitdefender-style Security Status & 1-Tap Full Scan)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -90,7 +92,7 @@ fun DashboardScreen(
                         imageVector = Icons.Default.Shield,
                         contentDescription = "Shield",
                         tint = StatusSafe,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(38.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -101,11 +103,32 @@ fun DashboardScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Local offline heuristics & signatures active",
+                            text = "Bitdefender-Grade Heuristics & App Anomaly Active",
                             color = TextSecondary,
                             fontSize = 12.sp
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Primary 1-Tap Full Scan CTA
+                Button(
+                    onClick = onScanAllAppsClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = GoldAccent,
+                        contentColor = BgDarkest
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Scan All Installed Apps",
+                        fontSize = 14.sp,
+                        style = MaterialTheme.typography.titleSmall
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -121,11 +144,11 @@ fun DashboardScreen(
                         Text("OFFLINE DB", color = TextPrimary, fontSize = 13.sp)
                     }
                     Column {
-                        Text("Integrity", color = TextSecondary, fontSize = 11.sp)
-                        Text("SHA-256", color = TextPrimary, fontSize = 13.sp)
+                        Text("App Shield", color = TextSecondary, fontSize = 11.sp)
+                        Text("ACTIVE", color = StatusSafe, fontSize = 13.sp)
                     }
                     Column {
-                        Text("Sandbox Mode", color = TextSecondary, fontSize = 11.sp)
+                        Text("Storage Mode", color = TextSecondary, fontSize = 11.sp)
                         Text("Scoped SAF", color = GoldAccent, fontSize = 13.sp)
                     }
                 }
@@ -143,14 +166,35 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Action Grid
+        // Action Grid Row 1
         Row(modifier = Modifier.fillMaxWidth()) {
+            ActionCard(
+                title = "Scan Apps",
+                subtitle = "Audit all installed APKs",
+                icon = Icons.Default.Apps,
+                modifier = Modifier.weight(1f),
+                onClick = onScanAllAppsClick
+            )
+            Spacer(modifier = Modifier.width(12.dp))
             ActionCard(
                 title = "Scan File",
                 subtitle = "User-selected SAF file",
                 icon = Icons.Default.FindInPage,
                 modifier = Modifier.weight(1f),
                 onClick = onScanDocumentClick
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Action Grid Row 2
+        Row(modifier = Modifier.fillMaxWidth()) {
+            ActionCard(
+                title = "Scan Folder",
+                subtitle = "Audit Downloads / Tree",
+                icon = Icons.Default.FolderSpecial,
+                modifier = Modifier.weight(1f),
+                onClick = onScanDirectoryClick
             )
             Spacer(modifier = Modifier.width(12.dp))
             ActionCard(
@@ -164,10 +208,11 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Action Grid Row 3
         Row(modifier = Modifier.fillMaxWidth()) {
             ActionCard(
                 title = "Quarantine Vault",
-                subtitle = "Isolated encrypted files",
+                subtitle = "AES-GCM encrypted vault",
                 icon = Icons.Default.Lock,
                 modifier = Modifier.weight(1f),
                 onClick = onQuarantineClick

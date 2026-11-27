@@ -1,6 +1,7 @@
 package com.biantivirus.security
 
 import android.app.Application
+import com.biantivirus.security.core.AppScannerEngine
 import com.biantivirus.security.core.QuarantineManager
 import com.biantivirus.security.core.ScannerEngine
 import com.biantivirus.security.core.SignatureDatabase
@@ -13,6 +14,9 @@ class BIAntivirusApp : Application() {
         private set
 
     lateinit var scannerEngine: ScannerEngine
+        private set
+
+    lateinit var appScannerEngine: AppScannerEngine
         private set
 
     lateinit var quarantineManager: QuarantineManager
@@ -38,6 +42,12 @@ class BIAntivirusApp : Application() {
         scannerEngine = ScannerEngine(
             signatureDb = signatureDatabase,
             quarantineManager = quarantineManager,
+            historyDb = historyDatabase
+        )
+
+        appScannerEngine = AppScannerEngine(
+            context = this,
+            signatureDb = signatureDatabase,
             historyDb = historyDatabase
         )
     }

@@ -152,6 +152,69 @@ class SettingsView(tk.Frame):
         )
         auto_exp.pack(fill="x", pady=(0, 14))
 
+        # Automated Scan Scheduler (Bitdefender Parity)
+        sched_hdr = tk.Label(
+            left_col,
+            text="AUTOMATED SCAN SCHEDULER",
+            bg=THEME["bg_panel"],
+            fg=THEME["accent_primary"],
+            font=(THEME["font_family"], 11, "bold"),
+            anchor="w",
+        )
+        sched_hdr.pack(fill="x", pady=(0, 6))
+
+        sched_frame = tk.Frame(left_col, bg=THEME["bg_input"], padx=12, pady=10)
+        sched_frame.pack(fill="x", pady=(0, 10))
+        sched_frame.configure(highlightbackground=THEME["border"], highlightthickness=1)
+
+        self.var_sched_enabled = tk.BooleanVar(value=True)
+        cb_sched = tk.Checkbutton(
+            sched_frame,
+            text="Enable Automated Scheduled Scanning",
+            variable=self.var_sched_enabled,
+            bg=THEME["bg_input"],
+            fg=THEME["accent_primary"],
+            selectcolor=THEME["bg_darkest"],
+            activebackground=THEME["bg_input"],
+            activeforeground=THEME["accent_primary"],
+            font=(THEME["font_family"], 9, "bold"),
+        )
+        cb_sched.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+
+        tk.Label(sched_frame, text="Depth:", bg=THEME["bg_input"], fg=THEME["text_secondary"], font=(THEME["font_family"], 8, "bold")).grid(row=1, column=0, sticky="w", pady=3)
+        self.var_sched_type = tk.StringVar(value="QUICK")
+        combo_type = ttk.Combobox(sched_frame, textvariable=self.var_sched_type, values=["QUICK", "FULL"], state="readonly", width=14)
+        combo_type.grid(row=1, column=1, sticky="w", padx=(6, 0), pady=3)
+
+        tk.Label(sched_frame, text="Freq:", bg=THEME["bg_input"], fg=THEME["text_secondary"], font=(THEME["font_family"], 8, "bold")).grid(row=2, column=0, sticky="w", pady=3)
+        self.var_sched_freq = tk.StringVar(value="daily")
+        combo_freq = ttk.Combobox(sched_frame, textvariable=self.var_sched_freq, values=["daily", "weekly"], state="readonly", width=14)
+        combo_freq.grid(row=2, column=1, sticky="w", padx=(6, 0), pady=3)
+
+        tk.Label(sched_frame, text="Time:", bg=THEME["bg_input"], fg=THEME["text_secondary"], font=(THEME["font_family"], 8, "bold")).grid(row=3, column=0, sticky="w", pady=3)
+        self.var_sched_time = tk.StringVar(value="12:00")
+        entry_time = tk.Entry(sched_frame, textvariable=self.var_sched_time, bg=THEME["bg_darkest"], fg=THEME["text_primary"], insertbackground=THEME["text_primary"], font=(THEME["font_mono"], 9), width=10, relief="flat", highlightbackground=THEME["border"], highlightthickness=1)
+        entry_time.grid(row=3, column=1, sticky="w", padx=(6, 0), pady=3)
+
+        self.sched_status_lbl = tk.Label(
+            left_col,
+            text="Scheduler Status: Active (Checked every 30s)",
+            bg=THEME["bg_panel"],
+            fg=THEME["status_safe"],
+            font=(THEME["font_family"], 8, "bold"),
+            anchor="w",
+        )
+        self.sched_status_lbl.pack(fill="x", pady=(0, 8))
+
+        sched_btns = tk.Frame(left_col, bg=THEME["bg_panel"])
+        sched_btns.pack(fill="x")
+
+        self.btn_save_sched = ttk.Button(sched_btns, text="💾 Save Schedule", style="Primary.TButton", command=self._on_save_schedules)
+        self.btn_save_sched.pack(side="left", padx=(0, 8))
+
+        self.btn_run_sched = ttk.Button(sched_btns, text="⚡ Run Now", style="Secondary.TButton", command=self._on_run_scheduled_now)
+        self.btn_run_sched.pack(side="left")
+
         # Storage Summary (Right Column)
         right_col = tk.Frame(grid_frame, bg=THEME["bg_panel"], padx=18, pady=18)
         right_col.pack(side="right", fill="both", expand=True, padx=(8, 0))
@@ -398,6 +461,21 @@ class SettingsView(tk.Frame):
             )
         )
 
+        # Refresh schedule controls (Bitdefender Parity)
+        schedules = settings.get("scheduled_scans", [])
+        if schedules and hasattr(self, "var_sched_enabled"):
+            first_task = schedules[0]
+            self.var_sched_enabled.set(first_task.get("enabled", True))
+            self.var_sched_type.set(first_task.get("type", "QUICK"))
+            self.var_sched_freq.set(first_task.get("frequency", "daily"))
+            self.var_sched_time.set(first_task.get("time", "12:00"))
+            last = first_task.get("last_run", "Never")
+            is_en = first_task.get("enabled", True)
+            self.sched_status_lbl.config(
+                text=f"Scheduler Status: {'ACTIVE' if is_en else 'PAUSED'} | Last Execution: {last or 'Never'}",
+                fg=THEME["status_safe"] if is_en else THEME["status_warning"],
+            )
+
     def _on_add_exclusion(self) -> None:
         folder = filedialog.askdirectory(title="Select Folder to Exclude from Antivirus Scanning")
         if folder:
@@ -481,6 +559,46 @@ class SettingsView(tk.Frame):
         settings["auto_quarantine_threats"] = self.var_auto_q.get()
         self.engine.detector.enable_heuristics = self.var_heuristics.get()
         save_settings(settings)
+
+    def _on_save_schedules(self) -> None:
+        settings = load_settings()
+        schedules = settings.get("scheduled_scans", [])
+        if not schedules:
+            schedules = [{
+                "id": "sched_daily_quick",
+                "name": "Daily Scheduled Scan",
+                "type": self.var_sched_type.get(),
+                "frequency": self.var_sched_freq.get(),
+                "time": self.var_sched_time.get().strip(),
+                "enabled": self.var_sched_enabled.get(),
+                "last_run": None,
+            }]
+        else:
+            task = schedules[0]
+            task["type"] = self.var_sched_type.get()
+            task["frequency"] = self.var_sched_freq.get()
+            task["time"] = self.var_sched_time.get().strip()
+            task["enabled"] = self.var_sched_enabled.get()
+        settings["scheduled_scans"] = schedules
+        save_settings(settings)
+        messagebox.showinfo(
+            "Schedule Saved",
+            f"Automated schedule profile updated successfully!\n\n"
+            f"Type: {self.var_sched_type.get()} Scan\n"
+            f"Frequency: {self.var_sched_freq.get().capitalize()}\n"
+            f"Scheduled Time: {self.var_sched_time.get()}\n"
+            f"Enabled: {self.var_sched_enabled.get()}",
+        )
+        self.refresh_data()
+
+    def _on_run_scheduled_now(self) -> None:
+        scan_type = self.var_sched_type.get()
+        if hasattr(self.engine, "start_scan"):
+            import threading
+            from bi_antivirus.config import SCAN_TYPE_FULL, SCAN_TYPE_QUICK
+            t = SCAN_TYPE_FULL if scan_type == "FULL" else SCAN_TYPE_QUICK
+            threading.Thread(target=self.engine.start_scan, args=(t,), daemon=True).start()
+            messagebox.showinfo("Scan Triggered", f"Automated {scan_type} Scan started in the background.")
 
     def _on_check_updates(self) -> None:
         self.refresh_data()
