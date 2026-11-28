@@ -379,10 +379,6 @@ class MainActivity : ComponentActivity() {
         isScanning = true
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val docUri = DocumentsContract.buildDocumentUriUsingTree(
-                    treeUri,
-                    DocumentsContract.getTreeDocumentId(treeUri)
-                )
                 val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
                     treeUri,
                     DocumentsContract.getTreeDocumentId(treeUri)

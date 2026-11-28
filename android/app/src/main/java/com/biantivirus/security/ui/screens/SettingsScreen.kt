@@ -8,7 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,132 +30,139 @@ fun SettingsScreen(
     var autoQuarantine by remember { mutableStateOf(prefs.isAutoQuarantine) }
     val scrollState = rememberScrollState()
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BgDarkest)
-            .padding(16.dp)
-            .verticalScroll(scrollState)
     ) {
-        // Top Bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = GoldAccent)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Security & Privacy Settings",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Settings Card
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(BgCard)
-                .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
+                .fillMaxSize()
+                .widthIn(max = 840.dp)
+                .align(Alignment.TopCenter)
                 .padding(16.dp)
+                .verticalScroll(scrollState)
         ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Heuristic Threat Analysis", color = TextPrimary, fontSize = 14.sp)
-                        Text("Inspects Shannon entropy & double extensions", color = TextSecondary, fontSize = 11.sp)
-                    }
-                    Switch(
-                        checked = heuristicEnabled,
-                        onCheckedChange = {
-                            heuristicEnabled = it
-                            prefs.isHeuristicEnabled = it
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = GoldAccent, checkedTrackColor = BgCardHover)
-                    )
+            // Top Bar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = GoldAccent)
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = BorderSubtle)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Automatic Threat Vaulting", color = TextPrimary, fontSize = 14.sp)
-                        Text("Requires explicit approval by default", color = TextSecondary, fontSize = 11.sp)
-                    }
-                    Switch(
-                        checked = autoQuarantine,
-                        onCheckedChange = {
-                            autoQuarantine = it
-                            prefs.isAutoQuarantine = it
-                        },
-                        colors = SwitchDefaults.colors(checkedThumbColor = GoldAccent, checkedTrackColor = BgCardHover)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "SOVEREIGN PRIVACY COMMITMENT",
-            color = TextSecondary,
-            fontSize = 12.sp,
-            style = MaterialTheme.typography.labelMedium
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(BgCard)
-                .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
-                .padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.Top) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_black_intel_emblem),
-                    contentDescription = "Black Intel Eagle Emblem",
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Security & Privacy Settings",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    style = MaterialTheme.typography.titleMedium
                 )
-                Spacer(modifier = Modifier.width(14.dp))
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Settings Card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(BgCard)
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
+                    .padding(16.dp)
+            ) {
                 Column {
-                    Text(
-                        text = "Black Intel Cyber Defense",
-                        color = GoldAccent,
-                        fontSize = 15.sp,
-                        style = MaterialTheme.typography.titleMedium
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Heuristic Threat Analysis", color = TextPrimary, fontSize = 14.sp)
+                            Text("Inspects Shannon entropy & double extensions", color = TextSecondary, fontSize = 11.sp)
+                        }
+                        Switch(
+                            checked = heuristicEnabled,
+                            onCheckedChange = {
+                                heuristicEnabled = it
+                                prefs.isHeuristicEnabled = it
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = GoldAccent, checkedTrackColor = BgCardHover)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = BorderSubtle)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Automatic Threat Vaulting", color = TextPrimary, fontSize = 14.sp)
+                            Text("Requires explicit approval by default", color = TextSecondary, fontSize = 11.sp)
+                        }
+                        Switch(
+                            checked = autoQuarantine,
+                            onCheckedChange = {
+                                autoQuarantine = it
+                                prefs.isAutoQuarantine = it
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = GoldAccent, checkedTrackColor = BgCardHover)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "SOVEREIGN PRIVACY COMMITMENT",
+                color = TextSecondary,
+                fontSize = 12.sp,
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(BgCard)
+                    .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
+                    .padding(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_black_intel_emblem),
+                        contentDescription = "Black Intel Eagle Emblem",
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp))
                     )
-                    Text(
-                        text = "Zero Cloud Telemetry Leakage • Enterprise v1.1.0",
-                        color = TextMuted,
-                        fontSize = 11.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "BI Antivirus runs 100% locally on your device. No document contents, hashes, filenames, or identity metrics are uploaded to external clouds. The engine operates entirely offline.",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "Black Intel Cyber Defense",
+                            color = GoldAccent,
+                            fontSize = 15.sp,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = "Zero Cloud Telemetry Leakage • Enterprise v1.1.0",
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "BI Antivirus runs 100% locally on your device. No document contents, hashes, filenames, or identity metrics are uploaded to external clouds. The engine operates entirely offline.",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
