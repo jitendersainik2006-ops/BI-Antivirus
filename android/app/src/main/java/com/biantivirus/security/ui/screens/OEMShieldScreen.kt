@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Launch
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -41,7 +42,7 @@ fun OEMShieldScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 720.dp)
+                .widthIn(max = 840.dp)
                 .align(Alignment.TopCenter)
                 .padding(16.dp)
                 .verticalScroll(scrollState)
@@ -54,7 +55,7 @@ fun OEMShieldScreen(
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = "Navigate back to previous screen",
                         tint = GoldAccent
                     )
                 }
@@ -92,21 +93,38 @@ fun OEMShieldScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "${status.manufacturer.uppercase()} ${status.model.uppercase()}",
+                                    color = GoldAccent,
+                                    fontSize = 16.sp,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(BgElevated)
+                                        .border(1.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = status.formFactor.name,
+                                        color = GoldAccent,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "${status.manufacturer.uppercase()} ${status.model.uppercase()}",
-                                color = GoldAccent,
-                                fontSize = 16.sp,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = status.guidanceTitle,
+                                text = "${status.osFlavor} • ${status.guidanceTitle}",
                                 color = TextSecondary,
                                 fontSize = 12.sp
                             )
                         }
                         Icon(
                             imageVector = if (status.isBatteryOptimizationIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
-                            contentDescription = null,
+                            contentDescription = if (status.isBatteryOptimizationIgnored) "Battery optimization ignored" else "Battery optimization restricted",
                             tint = statusColor,
                             modifier = Modifier.size(32.dp)
                         )
@@ -196,7 +214,7 @@ fun OEMShieldScreen(
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Launch, contentDescription = "Configure battery optimization", modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = status.actionLabel,

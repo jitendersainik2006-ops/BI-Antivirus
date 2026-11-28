@@ -97,6 +97,9 @@ class AppScannerEngine(
         val results = mutableListOf<InstalledAppThreat>()
 
         for (pkg in targetPackages) {
+            if (Thread.currentThread().isInterrupted) {
+                break
+            }
             val appInfo = pkg.applicationInfo ?: continue
             val appName = try {
                 pm.getApplicationLabel(appInfo).toString()

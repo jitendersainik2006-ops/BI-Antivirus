@@ -6,6 +6,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
@@ -57,6 +58,7 @@ class QuarantineManager(private val baseDirectory: File) {
     }
 
     private val ledgerFile: File = File(quarantineDir, "quarantine_ledger.json")
+    private val ledgerBackupFile: File = File(quarantineDir, "quarantine_ledger.json.bak")
     private val keyFile: File = File(quarantineDir, "vault_master.key")
 
     private val secureRandom = SecureRandom()
@@ -89,30 +91,78 @@ class QuarantineManager(private val baseDirectory: File) {
     @Synchronized
     private fun loadLedger() {
         records.clear()
-        if (!ledgerFile.exists()) return
+        if (!ledgerFile.exists() && !ledgerBackupFile.exists()) {
+            recoverFromVaultFiles()
+            return
+        }
 
-        try {
-            val content = ledgerFile.readText(Charsets.UTF_8)
-            val jsonArray = JSONArray(content)
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
+        var loaded = false
+        if (ledgerFile.exists()) {
+            try {
+                parseLedgerContent(ledgerFile.readText(Charsets.UTF_8))
+                loaded = true
+            } catch (_: Exception) {
+                // Main ledger failed, attempt backup
+            }
+        }
+
+        if (!loaded && ledgerBackupFile.exists()) {
+            try {
+                parseLedgerContent(ledgerBackupFile.readText(Charsets.UTF_8))
+                loaded = true
+            } catch (_: Exception) {
+                // Backup failed
+            }
+        }
+
+        if (!loaded) {
+            recoverFromVaultFiles()
+        }
+    }
+
+    private fun parseLedgerContent(content: String) {
+        val jsonArray = JSONArray(content)
+        for (i in 0 until jsonArray.length()) {
+            val obj = jsonArray.getJSONObject(i)
+            records.add(
+                QuarantineRecord(
+                    id = obj.getString("id"),
+                    originalFileName = obj.getString("originalFileName"),
+                    originalPath = obj.getString("originalPath"),
+                    quarantinedTimestamp = obj.getLong("quarantinedTimestamp"),
+                    sha256 = obj.getString("sha256"),
+                    threatName = obj.getString("threatName"),
+                    vaultFilePath = obj.getString("vaultFilePath"),
+                    fileSize = obj.getLong("fileSize"),
+                    status = QuarantineStatus.valueOf(obj.optString("status", QuarantineStatus.QUARANTINED.name)),
+                    restoredTimestamp = if (obj.has("restoredTimestamp") && !obj.isNull("restoredTimestamp")) obj.getLong("restoredTimestamp") else null
+                )
+            )
+        }
+    }
+
+    private fun recoverFromVaultFiles() {
+        val vaultFiles = quarantineDir.listFiles { file -> file.isFile && file.extension == "biq" } ?: return
+        for (vf in vaultFiles) {
+            val id = vf.nameWithoutExtension
+            if (records.none { it.id == id }) {
                 records.add(
                     QuarantineRecord(
-                        id = obj.getString("id"),
-                        originalFileName = obj.getString("originalFileName"),
-                        originalPath = obj.getString("originalPath"),
-                        quarantinedTimestamp = obj.getLong("quarantinedTimestamp"),
-                        sha256 = obj.getString("sha256"),
-                        threatName = obj.getString("threatName"),
-                        vaultFilePath = obj.getString("vaultFilePath"),
-                        fileSize = obj.getLong("fileSize"),
-                        status = QuarantineStatus.valueOf(obj.optString("status", QuarantineStatus.QUARANTINED.name)),
-                        restoredTimestamp = if (obj.has("restoredTimestamp") && !obj.isNull("restoredTimestamp")) obj.getLong("restoredTimestamp") else null
+                        id = id,
+                        originalFileName = "recovered_$id.bin",
+                        originalPath = "Unknown (recovered from vault)",
+                        quarantinedTimestamp = vf.lastModified(),
+                        sha256 = "recovered_${id.lowercase()}",
+                        threatName = "Recovered.Vault.Item",
+                        vaultFilePath = vf.absolutePath,
+                        fileSize = vf.length(),
+                        status = QuarantineStatus.QUARANTINED
                     )
                 )
             }
-        } catch (_: Exception) {
-            // Ledger fallback
+        }
+        if (records.isNotEmpty()) {
+            saveLedger()
         }
     }
 
@@ -133,7 +183,20 @@ class QuarantineManager(private val baseDirectory: File) {
             obj.put("restoredTimestamp", r.restoredTimestamp ?: JSONObject.NULL)
             jsonArray.put(obj)
         }
-        ledgerFile.writeText(jsonArray.toString(2), Charsets.UTF_8)
+
+        val tempLedgerFile = File(quarantineDir, "quarantine_ledger.json.tmp")
+        tempLedgerFile.writeText(jsonArray.toString(2), Charsets.UTF_8)
+
+        if (ledgerFile.exists()) {
+            try {
+                ledgerFile.copyTo(ledgerBackupFile, overwrite = true)
+            } catch (_: Exception) {}
+        }
+
+        if (ledgerFile.exists()) {
+            ledgerFile.delete()
+        }
+        tempLedgerFile.renameTo(ledgerFile)
     }
 
     private fun computeSha256(data: ByteArray): String {
@@ -150,6 +213,12 @@ class QuarantineManager(private val baseDirectory: File) {
         threatName: String,
         sha256: String
     ): QuarantineRecord {
+        val usableSpace = quarantineDir.usableSpace
+        // Check storage space if reported by filesystem
+        if (usableSpace in 1 until (bytes.size + 1024 * 1024L)) {
+            throw IOException("Insufficient storage space in quarantine directory ($usableSpace bytes available, ${bytes.size} bytes required)")
+        }
+
         val id = "Q-" + UUID.randomUUID().toString().substring(0, 8).uppercase()
         val vaultFile = File(quarantineDir, "$id.biq")
 

@@ -5,6 +5,7 @@ import com.biantivirus.security.model.ScanVerdict
 import com.biantivirus.security.model.ThreatSeverity
 import com.biantivirus.security.storage.ScanHistoryDatabase
 import java.io.ByteArrayInputStream
+import java.io.FileNotFoundException
 import java.io.InputStream
 import java.util.UUID
 
@@ -28,6 +29,22 @@ class ScannerEngine(
         inputStream: InputStream
     ): ScanResult {
         val scanId = "SCAN-" + UUID.randomUUID().toString().substring(0, 8).uppercase()
+
+        // Check if thread was already cancelled or interrupted
+        if (Thread.currentThread().isInterrupted) {
+            return ScanResult(
+                scanId = scanId,
+                fileName = fileName,
+                filePath = filePath,
+                fileSize = fileSize,
+                sha256 = "",
+                md5 = "",
+                entropy = 0.0,
+                verdict = ScanVerdict.SCAN_ERROR,
+                severity = ThreatSeverity.LOW,
+                errorMessage = "SCAN_CANCELLED: Scan was interrupted or cancelled by the user."
+            )
+        }
 
         return try {
             val rawBytes = inputStream.readBytes()
@@ -218,6 +235,32 @@ class ScannerEngine(
             historyDb?.recordScan(cleanResult)
             cleanResult
 
+        } catch (e: SecurityException) {
+            ScanResult(
+                scanId = scanId,
+                fileName = fileName,
+                filePath = filePath,
+                fileSize = fileSize,
+                sha256 = "",
+                md5 = "",
+                entropy = 0.0,
+                verdict = ScanVerdict.SCAN_ERROR,
+                severity = ThreatSeverity.LOW,
+                errorMessage = "ACCESS_DENIED: Access permission revoked by Android Storage Access Framework: ${e.localizedMessage}"
+            )
+        } catch (e: FileNotFoundException) {
+            ScanResult(
+                scanId = scanId,
+                fileName = fileName,
+                filePath = filePath,
+                fileSize = fileSize,
+                sha256 = "",
+                md5 = "",
+                entropy = 0.0,
+                verdict = ScanVerdict.SCAN_ERROR,
+                severity = ThreatSeverity.LOW,
+                errorMessage = "FILE_NOT_FOUND: Target file was moved, unmounted, or deleted: ${e.localizedMessage}"
+            )
         } catch (e: Exception) {
             ScanResult(
                 scanId = scanId,

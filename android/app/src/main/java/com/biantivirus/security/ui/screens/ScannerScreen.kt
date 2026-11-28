@@ -39,13 +39,19 @@ fun ScannerScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: App Scanner, 1: File Scanner
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BgDarkest)
-            .padding(16.dp)
     ) {
-        // Top Bar
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 840.dp)
+                .align(Alignment.TopCenter)
+                .padding(16.dp)
+        ) {
+            // Top Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -512,4 +518,5 @@ fun ScannerScreen(
             }
         }
     }
+}
 }

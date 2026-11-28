@@ -33,20 +33,26 @@ fun QuarantineScreen(
 
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BgDarkest)
-            .padding(16.dp)
     ) {
-        // Top Bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = 840.dp)
+                .align(Alignment.TopCenter)
+                .padding(16.dp)
         ) {
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = GoldAccent)
-            }
+            // Top Bar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = GoldAccent)
+                }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Quarantine Vault",
@@ -215,6 +221,7 @@ fun QuarantineScreen(
             }
         }
     }
+}
 
     // Restore Confirmation Dialog
     if (recordToRestore != null) {
